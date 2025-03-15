@@ -4,7 +4,9 @@ Language Features:
 * Yul: Introduce builtin `clz(x)` for counting the number of leading zero bits in a 256-bit word.
 
 Compiler Features:
+* Custom Storage Layout: Allow using `constant` state variables in the base slot expression.
 * ethdebug: Experimental support for instructions and source locations under EOF.
+
 
 Bugfixes:
 * Assembler: Fix not using a fixed-width type for IDs being assigned to subassemblies nested more than one level away, resulting in inconsistent `--asm-json` output between target architectures.
