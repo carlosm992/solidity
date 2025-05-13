@@ -21,6 +21,9 @@
 
 #pragma once
 
+#include "libsolidity/ast/Types.h"
+
+
 #include <libyul/AST.h>
 #include <libyul/AsmAnalysisInfo.h>
 #include <libyul/Dialect.h>
