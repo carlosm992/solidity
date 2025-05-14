@@ -69,8 +69,9 @@ add_library(yul
 	backends/evm/OptimizedEVMCodeTransform.cpp
 	backends/evm/OptimizedEVMCodeTransform.h
     backends/evm/SSACFGBridgeFinder.h
-    backends/evm/SSACFGRevertPaths.cpp
-    backends/evm/SSACFGRevertPaths.h
+
+		backends/evm/SSACFGJunkBlockFinder.cpp
+		backends/evm/SSACFGJunkBlockFinder.h
     backends/evm/SSACFGStackShuffler.h
     backends/evm/SSACFGStackLayout.cpp
     backends/evm/SSACFGStackLayout.h
