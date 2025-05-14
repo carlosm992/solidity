@@ -18,6 +18,7 @@
 
 #include <libyul/backends/evm/ssa/SSACFG.h>
 
+#include <libyul/backends/evm/SSACFGBridgeFinder.h>
 #include <libyul/backends/evm/ssa/LivenessAnalysis.h>
 
 #include <libsolutil/StringUtils.h>
