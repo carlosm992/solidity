@@ -4,6 +4,7 @@ Language Features:
 * Yul: Introduce builtin `clz(x)` for counting the number of leading zero bits in a 256-bit word.
 
 Compiler Features:
+* Constant Evaluator: Support for constants referenced by member access expressions.
 * ethdebug: Experimental support for instructions and source locations under EOF.
 
 Bugfixes:

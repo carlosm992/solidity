@@ -39,6 +39,8 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
 
+#include <range/v3/algorithm/find_if.hpp>
+
 using namespace solidity;
 using namespace solidity::langutil;
 using namespace solidity::frontend;
@@ -503,4 +505,36 @@ void ReferencesResolver::validateYulIdentifierName(yul::YulName _name, SourceLoc
 			_location,
 			"The identifier name \"" + _name.str() + "\" is reserved."
 		);
+}
+
+void ReferencesResolver::endVisit(MemberAccess const& _memberAccess)
+{
+	// This is only for specific cases to support ConstantEvaluator.
+	std::vector<Declaration const*> candidates;
+	if (auto const* identifier = dynamic_cast<Identifier const*>(&_memberAccess.expression()))
+	{
+		if (auto const* contract = dynamic_cast<ContractDefinition const*>(identifier->annotation().referencedDeclaration))
+			candidates += contract->stateVariables();
+		else if (auto const* importedModule = dynamic_cast<ImportDirective const*>(identifier->annotation().referencedDeclaration))
+		{
+			SourceUnit const* sourceUnit = importedModule->annotation().sourceUnit;
+			solAssert(sourceUnit);
+			candidates += ASTNode::filteredNodes<VariableDeclaration>(sourceUnit->nodes());
+			candidates += ASTNode::filteredNodes<ContractDefinition>(sourceUnit->nodes());
+		}
+	}
+	else if (auto const* nestedMemberAccess = dynamic_cast<MemberAccess const*>(&_memberAccess.expression()))
+	{
+		auto const* contract = dynamic_cast<ContractDefinition const*>(nestedMemberAccess->annotation().referencedDeclaration);
+		if (!contract)
+			return;
+		candidates += contract->stateVariables();
+	}
+
+	auto declaration = ranges::find_if(
+		candidates,
+		[&](Declaration const* _declaration) { return _declaration->name() == _memberAccess.memberName(); }
+	);
+	if (declaration != ranges::end(candidates))
+		_memberAccess.annotation().referencedDeclaration = *declaration;
 }

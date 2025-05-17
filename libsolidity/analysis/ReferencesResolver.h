@@ -86,6 +86,7 @@ private:
 	bool visit(Return const& _return) override;
 	bool visit(UsingForDirective const& _usingFor) override;
 	bool visit(BinaryOperation const& _binaryOperation) override;
+	void endVisit(MemberAccess const& _memberAccess) override;
 
 	void operator()(yul::FunctionDefinition const& _function) override;
 	void operator()(yul::Identifier const& _identifier) override;

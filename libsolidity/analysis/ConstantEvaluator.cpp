@@ -407,3 +407,15 @@ void ConstantEvaluator::endVisit(TupleExpression const& _tuple)
 	if (!_tuple.isInlineArray() && _tuple.components().size() == 1)
 		m_values[&_tuple] = evaluate(*_tuple.components().front());
 }
+
+void ConstantEvaluator::endVisit(MemberAccess const& _memberAccess)
+{
+	auto const* referencedDeclaration = _memberAccess.annotation().referencedDeclaration;
+	if (!referencedDeclaration)
+		return;
+	if (
+		auto const* variable = dynamic_cast<VariableDeclaration const*>(referencedDeclaration);
+		variable && variable->isConstant()
+	)
+		m_values[&_memberAccess] = evaluate(*variable);
+}
