@@ -70,12 +70,13 @@ add_library(yul
 	backends/evm/OptimizedEVMCodeTransform.h
     backends/evm/SSACFGBridgeFinder.h
 
-		backends/evm/SSACFGJunkBlockFinder.cpp
-		backends/evm/SSACFGJunkBlockFinder.h
-    backends/evm/SSACFGStackShuffler.h
-    backends/evm/SSACFGStackLayout.cpp
-    backends/evm/SSACFGStackLayout.h
-    backends/evm/SSACFGEVMCodeTransform.cpp
+	backends/evm/SSACFGJunkBlockFinder.cpp
+	backends/evm/SSACFGJunkBlockFinder.h
+	backends/evm/SSACFGStackShuffler.h
+	backends/evm/SSACFGStack.h
+	backends/evm/SSACFGStackLayout.cpp
+	backends/evm/SSACFGStackLayout.h
+	backends/evm/SSACFGEVMCodeTransform.cpp
     backends/evm/SSACFGEVMCodeTransform.h
 	backends/evm/StackHelpers.h
 	backends/evm/StackLayoutGenerator.cpp
