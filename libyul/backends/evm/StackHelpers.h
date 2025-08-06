@@ -231,7 +231,7 @@ private:
 			return false;
 		}
 
-		size_t sourceTop = ops.sourceSize() - 1;
+		size_t const sourceTop = ops.sourceSize() - 1;
 		// If we no longer need the current stack top, we pop it, unless we need an arbitrary slot at this position
 		// in the target.
 		if (

@@ -13,10 +13,40 @@ namespace solidity::yul::ssa
 
 class StackLayoutGenerator
 {
+
 public:
-	using StackType = Stack<StackSlot>;
+	using Slot = StackSlot;
+#if !defined(NDEBUG)
+	struct StackManipulationCallbacks
+	{
+		static bool writeCallbackOutput;
+		using Slot = Slot;
+		static void swap(size_t _depth)
+		{
+			if (writeCallbackOutput)
+				std::cout << "SWAP" << _depth << std::flush << " + ";
+		}
+		static void dup(size_t _depth)
+		{
+			if (writeCallbackOutput)
+				std::cout << "DUP" << _depth << std::flush << " + ";
+		}
+		static void push(Slot const& _slot)
+		{
+			if (writeCallbackOutput)
+				std::cout << "PUSH " << slotToString(_slot) << std::flush << " + ";
+		}
+		static void pop()
+		{
+			if (writeCallbackOutput)
+				std::cout << "POP" << std::flush << " + ";
+		}
+	};
+#else
+	using StackManipulationCallbacks = NoOpStackManipulationCallbacks<StackSlot>;
+#endif
+	using StackType = Stack<Slot, StackManipulationCallbacks>;
 	using StackData = StackType::Data;
-	using Slot = StackType::Slot;
 
 	static ControlFlowLayout generate(ControlFlowLiveness const& _controlFlowLiveness);
 	static SSACFGStackLayout generate(SSACFGLiveness const& _cfgLiveness);

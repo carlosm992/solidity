@@ -1,16 +1,23 @@
 #include "libyul/backends/evm/SSACFGLiveness.h"
 #include "libyul/backends/evm/SSACFGStackShuffler.h"
+#include "range/v3/algorithm/equal.hpp"
 #include "range/v3/algorithm/none_of.hpp"
 #include "range/v3/algorithm/replace.hpp"
 #include "range/v3/algorithm/sort.hpp"
-
+#include "range/v3/view/drop.hpp"
 
 #include <libyul/backends/evm/ssa/StackLayoutGenerator.h>
+#include <libyul/backends/evm/ssa/OperationForwardShuffler.h>
+
 #include <queue>
 #include <ranges>
 
 using namespace solidity::yul;
 using namespace solidity::yul::ssa;
+
+#if !defined(NDEBUG)
+bool StackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = true;
+#endif
 
 namespace
 {
@@ -55,7 +62,6 @@ void junkShuffler(StackLayoutGenerator::StackType& _stack)
 	size_t i = 0;
 	while (numJunk > 0 && i < numJunk)
 	{
-		auto const depth = _stack.size() - i - 1;
 		if (std::holds_alternative<ssa::JunkSlot>(_stack.data()[i]))
 		{
 			// we have a block of i junk slots at the bottom
@@ -66,14 +72,8 @@ void junkShuffler(StackLayoutGenerator::StackType& _stack)
 		if (std::holds_alternative<ssa::JunkSlot>(_stack.top()))
 		{
 			// todo it might be cheaper to swap or to pop
-			/*// if we can reach the non-junk slot, swap it up, else pop the junk
-			if (depth <= 16)
-			{
-				_stack.swap(depth);
-				++i;
-				continue;
-			}
-			else*/
+			// if we can reach the non-junk slot, swap it up, else pop the junk
+
 			{
 				_stack.pop();
 				--numJunk;
@@ -81,41 +81,22 @@ void junkShuffler(StackLayoutGenerator::StackType& _stack)
 			}
 		}
 
-		// find the next best junk to swap to the top:
-		//   - if there is a junk slot in reach that is in isolation, ie, surrounded by non-junk, take that one
-		//   - otherwise, if just take whatever junk slot is in reach
-		//   - if none is in reach, give up and break
-		std::optional<size_t> nonIsolatedJunk(std::nullopt);
-		std::optional<size_t> isolatedJunk(std::nullopt);
+		// find the next best junk
+		std::optional<size_t> junk(std::nullopt);
 		for (size_t junkDepth = 1; junkDepth < std::min(static_cast<size_t>(17), _stack.size()); ++junkDepth)
 			if (std::holds_alternative<ssa::JunkSlot>(_stack.slot(junkDepth)))
 			{
-				bool isolated = !std::holds_alternative<ssa::JunkSlot>(_stack.slot(junkDepth - 1));
-				if (junkDepth + 1 < _stack.size())
-					isolated &= !std::holds_alternative<ssa::JunkSlot>(_stack.slot(junkDepth + 1));
-
-				if (isolated)
-				{
-					isolatedJunk = junkDepth;
-					break;
-				}
-
-				if (!nonIsolatedJunk)
-					nonIsolatedJunk = junkDepth;
+				junk = junkDepth;
+				break;
 			}
 
-		if (isolatedJunk)
+		if (junk)
 		{
-			_stack.swap(*isolatedJunk);
+			_stack.swap(*junk);
 			continue;
 		}
 
-		if (nonIsolatedJunk)
-		{
-			_stack.swap(*nonIsolatedJunk);
-			continue;
-		}
-
+		// give up if there's no more junk in reach
 		break;
 	}
 }
@@ -344,6 +325,9 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 	{
 		SSACFG::Operation const& operation = block.operations[operationIndex];
 		SSACFGLiveness::LivenessData opLiveOut = operationsLiveOut[operationIndex];
+		auto opLiveOutWithoutOutputs = opLiveOut;
+		for (auto const& output: operation.outputs)
+			opLiveOutWithoutOutputs.erase(output);
 
 		if constexpr(debugOutput)
 		{
@@ -372,39 +356,48 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		{
 			return std::holds_alternative<JunkSlot>(_target) || _source == _target;
 		};
-		/*auto const fun = [&](Slot const& _slot) -> bool
-		{
-			if (auto const* valueId = std::get_if<SSACFG::ValueId>(&_slot))
-				return !liveOutWithoutOutputsSet.contains(*valueId);
-			return false;
-		};*/
-		// auto tail = _stack.data();
 
 		for (size_t depth = 0; depth < stack.size(); ++depth)
 			if (!liveOutWithoutOutputsSet.contains(stack.slot(depth)) && ranges::find(requiredStackTop, stack.slot(depth)) == ranges::end(requiredStackTop))
 				stack.declareJunk(depth);
-		junkShuffler(stack);
+		/*junkShuffler(stack);*/
 
-		if (!m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId))
+		// declareJunk(stack, opLiveOutWithoutOutputs );
+		if constexpr(debugOutput)
+			std::cout << "{ " << stackToString(std::vector(liveOutWithoutOutputs.begin(), liveOutWithoutOutputs.end()), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ") -> " << std::flush;
+		OperationForwardShuffler<>::shuffle(stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
+		/*if (!m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId))
 		{
 			if constexpr(debugOutput)
-				std::cout << "{ " << stackToString(std::vector(liveOutWithoutOutputs.begin(), liveOutWithoutOutputs.end()), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ")\n";
+				std::cout << "{ " << stackToString(std::vector(liveOutWithoutOutputs.begin(), liveOutWithoutOutputs.end()), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ")";
 			DanielShuffler<StackType>::shuffle(stack, liveOutWithoutOutputsSet, requiredStackTop);
 		}
 		else
 		{
 			if constexpr(debugOutput)
-				std::cout << "{ " << stackToString(pileOfJunk<Slot>(junkTailSize(stack.data())), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ")\n";
+				std::cout << "{ " << stackToString(pileOfJunk<Slot>(junkTailSize(stack.data())), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ")";
 			auto const v = stack.data() | ranges::views::transform([&](auto const& _slot) -> Slot { return liveOutWithoutOutputsSet.contains(_slot) ? _slot : JunkSlot{}; }) | ranges::to<std::vector<Slot>>;
 			DanielShuffler<StackType>::shuffle(stack, {}, v + requiredStackTop);
-		}
+		}*/
+
 
 		m_stackLayout[_blockId].operationIn.push_back(currentStackData);
 
+		if constexpr(debugOutput)
+			#if !defined(NDEBUG)
+			StackManipulationCallbacks::writeCallbackOutput = false;
+			#endif
 		for (size_t i = 0; i < requiredStackTop.size(); ++i)
 			stack.pop();
 		for (auto const& val: operation.outputs)
 			stack.push(val);
+		if constexpr(debugOutput)
+			#if !defined(NDEBUG)
+			StackManipulationCallbacks::writeCallbackOutput = true;
+			#endif
+
+		if constexpr(debugOutput)
+			fmt::print(" -> {}\n", stackToString(currentStackData, m_cfg));
 	}
 
 	if (auto const* cjump = std::get_if<SSACFG::BasicBlock::ConditionalJump>(&block.exit))

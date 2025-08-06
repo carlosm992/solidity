@@ -113,6 +113,7 @@ size_t junkTailSize(StackData const& _stackData)
 	}
 	return numJunk;
 }
+std::string slotToString(StackSlot const& _slot);
 std::string slotToString(StackSlot const& _slot, SSACFG const& _cfg);
 std::string stackToString(StackData const& _stackData, SSACFG const& _cfg);
 
@@ -194,11 +195,14 @@ public:
 
 	void pushOrDup(Slot const& _slot)
 	{
+		// todo this is not optimal: sometimes i want to dup even if i could push
 		if (canBeFreelyGenerated(_slot))
 			push(_slot);
 		else
 			dup(_slot);
 	}
+
+	bool empty() const { return size() == 0; }
 
 	size_t size() const
 	{
