@@ -35,3 +35,5 @@ contract D is C {
 // ====
 // bytecodeFormat: legacy
 // ----
+// Warning 9511: (B:0-19): ABI coder v1 is deprecated and scheduled for removal in the next breaking version (0.9). Use ABI coder v2 instead.
+// Warning 9511: (C:0-19): ABI coder v1 is deprecated and scheduled for removal in the next breaking version (0.9). Use ABI coder v2 instead.
