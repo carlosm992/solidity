@@ -8,3 +8,5 @@ contract C is A, B {
     modifier f() override(A,B) { _; }
 }
 // ----
+// Warning 8429: (17-44): Virtual modifiers are deprecated and scheduled for removal in the next breaking version (0.9).
+// Warning 8429: (64-91): Virtual modifiers are deprecated and scheduled for removal in the next breaking version (0.9).

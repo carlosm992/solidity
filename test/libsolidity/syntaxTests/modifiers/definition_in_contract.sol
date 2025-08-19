@@ -9,3 +9,6 @@ abstract contract A {
     modifier muv virtual;
 }
 // ----
+// Warning 8429: (39-65): Virtual modifiers are deprecated and scheduled for removal in the next breaking version (0.9).
+// Warning 8429: (117-143): Virtual modifiers are deprecated and scheduled for removal in the next breaking version (0.9).
+// Warning 8429: (148-169): Virtual modifiers are deprecated and scheduled for removal in the next breaking version (0.9).

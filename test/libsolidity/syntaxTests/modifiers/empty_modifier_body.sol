@@ -13,3 +13,5 @@ contract D is C {
 	}
 }
 // ----
+// Warning 8429: (22-51): Virtual modifiers are deprecated and scheduled for removal in the next breaking version (0.9).
+// Warning 8429: (134-153): Virtual modifiers are deprecated and scheduled for removal in the next breaking version (0.9).
