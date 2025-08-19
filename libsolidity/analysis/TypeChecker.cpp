@@ -1829,6 +1829,17 @@ void TypeChecker::endVisit(BinaryOperation const& _operation)
 				)
 			);
 	}
+	if (
+		TokenTraits::isCompareOp(_operation.getOperator()) &&
+		commonType->category() == Type::Category::Contract
+	)
+		m_errorReporter.warning(
+			9170_error,
+			_operation.location(),
+			"Comparison of variables of contract type is deprecated and scheduled for removal "
+			"in the next breaking version (0.9). "
+			"Use an explicit cast to address type and compare the addresses instead."
+		);
 }
 
 Type const* TypeChecker::typeCheckTypeConversionAndRetrieveReturnType(
