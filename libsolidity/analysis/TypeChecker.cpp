@@ -3223,6 +3223,20 @@ bool TypeChecker::visit(MemberAccess const& _memberAccess)
 				if (contractType && contractType->isSuper())
 					requiredLookup = VirtualLookup::Super;
 			}
+
+		if (
+			funType->kind() == FunctionType::Kind::Send ||
+			funType->kind() == FunctionType::Kind::Transfer
+		)
+			m_errorReporter.warning(
+				9207_error,
+				_memberAccess.location(),
+				fmt::format(
+					"'{}' is deprecated and scheduled for removal in the next breaking version (0.9). "
+					"Use 'call{{value: <amount>}}(\"\")' instead.",
+					funType->kind() == FunctionType::Kind::Send ? "send" : "transfer"
+				)
+			);
 	}
 
 	annotation.requiredLookup = requiredLookup;
