@@ -17,4 +17,5 @@ contract D {
     }
 }
 // ----
+// Warning 9207: (187-209): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}()' instead.
 // Warning 2018: (17-134): Function state mutability can be restricted to view

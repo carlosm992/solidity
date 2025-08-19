@@ -20,3 +20,5 @@ contract C {
 // ====
 // bytecodeFormat: >=EOFv1
 // ----
+// Warning 9207: (47-69): transfer will be deprecated in the next breaking version.
+// Warning 9207: (90-108): send will be deprecated in the next breaking version.
