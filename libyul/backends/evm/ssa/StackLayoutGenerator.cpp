@@ -411,11 +411,11 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 
 		if constexpr(debugOutput)
 		{
-			std::string const operationName = std::visit(util::GenericVisitor(
+			std::string const operationName = std::visit(util::GenericVisitor{
 				[](SSACFG::Call const& _call) { return _call.function.get().name.str(); },
 				[](SSACFG::BuiltinCall const& _call) { return _call.builtin.get().name; },
 				[](SSACFG::LiteralAssignment const&) -> std::string { return "assign"; }
-			), operation.kind);
+			}, operation.kind);
 			std::cout << "\t\t" << operationName << "(" << stackToString(currentStackData, m_cfg) << " -> ";
 		}
 

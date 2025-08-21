@@ -240,7 +240,7 @@ public:
 		m_data->resize(m_data->size() + static_cast<std::size_t>(_numJunk));
 		std::fill_n(m_data->rbegin(), static_cast<std::size_t>(_numJunk), JunkSlot{});
 		// rotate to the right by numJunk elements, now they're in the tail
-		std::rotate(m_data->rbegin(), m_data->rbegin() + static_cast<std::ptrdiff_t>(_numJunk), m_data.rend());
+		std::rotate(m_data->rbegin(), m_data->rbegin() + static_cast<std::ptrdiff_t>(_numJunk), m_data->rend());
 	}
 
 	Data const& data() const
