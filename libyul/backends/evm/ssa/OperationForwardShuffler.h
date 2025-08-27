@@ -303,7 +303,7 @@ private:
 				yulAssert(false);
 			}
 			yulAssert(ops.stackAdmissible());
-			return true;
+			return false;
 		}
 
 		yulAssert(!_args.empty(), "From here on out, we need slots to be required in the top. Otherwise we should've terminated already.");
@@ -341,15 +341,23 @@ private:
 			yulAssert(ops.args.size() > 1);
 			// todo shortcut
 			// try finding a reachable out-of-position target position that, if swapped to, also fixes the top
-			for (size_t depth = 1; depth < ops.args.size(); ++depth)
+			for (size_t depth = 1; depth < std::min(_stack.size(), ops.args.size()); ++depth)
 				if (ops.isArgsCompatible(depth, 0) && ops.isArgsCompatible(0, depth) && !ops.isArgsCompatible(depth, depth))
 				{
 					_stack.swap(depth);
 					return true;
 				}
 
+//			// if the top can be freely generated, generate it
+//			if (_stack.canBeFreelyGenerated(_args.back()))
+//			{
+//				_stack.push(_args.back());
+//				return true;
+//			}
+
+
 			// otherwise take the deepest args target slot that doesn’t hold an identical value and isn't in position
-			for (size_t depth = 1; depth < ops.args.size(); ++depth)
+			for (size_t depth = 1; depth < std::min(_stack.size(), ops.args.size()); ++depth)
 				if (ops.isArgsCompatible(0, depth) && !ops.isSourceCompatible(0, depth) && !ops.isArgsCompatible(depth, depth))
 				{
 					_stack.swap(depth);
