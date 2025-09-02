@@ -56,6 +56,11 @@ Members of ``address``
   returns ``false`` on failure
 - ``<address payable>.transfer(uint256 amount)``: send given amount of Wei to :ref:`address`, throws on failure
 
+.. warning::
+    ``send`` and ``transfer`` are deprecated and scheduled for removal in the next breaking version (0.9).
+    Use the :ref:`call function <address_call_functions>` with an optionally provided maximum amount of
+    gas (by default forwards 63/64 of the remaining gas) and an empty calldata parameter, e.g., ``call{value: amount}("")``.
+
 .. index:: blockhash, blobhash, block, block;basefee, block;blobbasefee, block;chainid, block;coinbase, block;difficulty, block;gaslimit, block;number, block;prevrandao, block;timestamp
 .. index:: gasleft, msg;data, msg;sender, msg;sig, msg;value, tx;gasprice, tx;origin
 

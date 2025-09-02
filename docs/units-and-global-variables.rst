@@ -268,6 +268,11 @@ Members of Address Types
 ``<address payable>.send(uint256 amount) returns (bool)``
     send given amount of Wei to :ref:`address`, returns ``false`` on failure, forwards 2300 gas stipend, not adjustable
 
+.. warning::
+    ``send`` and ``transfer`` are deprecated and scheduled for removal in the next breaking version (0.9).
+    Use the :ref:`call function <address_call_functions>` with an optionally provided maximum amount of
+    gas (default forwards all remaining gas) and an empty calldata parameter, e.g., ``call{value: amount}("")``.
+
 ``<address>.call(bytes memory) returns (bool, bytes memory)``
     issue low-level ``CALL`` with the given payload, returns success condition and return data, forwards all available gas, adjustable
 
