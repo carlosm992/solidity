@@ -116,6 +116,7 @@ size_t junkTailSize(StackData const& _stackData)
 std::string slotToString(StackSlot const& _slot);
 std::string slotToString(StackSlot const& _slot, SSACFG const& _cfg);
 std::string stackToString(StackData const& _stackData, SSACFG const& _cfg);
+std::string stackToString(StackData const& _stackData);
 
 template<
 	typename StackSlot,
@@ -196,7 +197,8 @@ public:
 	void pushOrDup(Slot const& _slot)
 	{
 		// todo this is not optimal: sometimes i want to dup even if i could push
-		if (canBeFreelyGenerated(_slot))
+		auto const maybeSlot = slotDepth(_slot);
+		if (!(maybeSlot && maybeSlot.value() < reachableStackDepth) && canBeFreelyGenerated(_slot))
 			push(_slot);
 		else
 			dup(_slot);
