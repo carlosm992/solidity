@@ -351,7 +351,7 @@ private:
 		}
 
 		// if the top is out of position and required in args
-		if (!_stack.empty() && !ops.isArgsCompatible(0, 0) && ops.requiredInArgs(_stack.top()))
+		if (!_stack.empty() && !ops.isArgsCompatible(0, 0) && ops.stackStats.argsCount(_stack.top()) <= ops.targetArgsCount(_stack.top()))
 		{
 			yulAssert(ops.args.size() > 1);
 			// todo shortcut
@@ -388,8 +388,24 @@ private:
 					return true;
 				}
 
-			// todo we could try compressing args
-			yulAssert(false, "stack too deep");
+			// try finding a reachable out-of-position arg slot that fixes the top
+			for (size_t depth = 1; depth < std::min(_stack.size(), ops.args.size()); ++depth)
+				if (ops.isArgsCompatible(depth, 0) && !ops.isArgsCompatible(depth, depth))
+				{
+					_stack.swap(depth);
+					return true;
+				}
+
+			// If there is a reachable slot to be removed, park the current top there.
+			for (size_t swapDepth: ranges::views::iota(1u, ReachableStackDepth + 1u) | ranges::views::reverse)
+				if (swapDepth < _stack.size() && ops.canBePopped(_stack.slot(swapDepth)))
+				{
+					_stack.swap(swapDepth);
+					_stack.pop();
+					return true;
+				}
+
+			yulAssert(false, fmt::format("stack too deep: {}", stackToString(_stack.data())));
 		}
 
 		yulAssert(_stack.empty() || std::holds_alternative<JunkSlot>(_stack.top()) || ops.isArgsCompatible(0, 0) || ops.requiredInTail(_stack.top()));
