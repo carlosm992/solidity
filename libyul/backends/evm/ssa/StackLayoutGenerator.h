@@ -20,6 +20,7 @@ public:
 	struct StackManipulationCallbacks
 	{
 		static bool writeCallbackOutput;
+		static size_t numOps;
 		using Slot = Slot;
 		static void swap(size_t _depth)
 		{
@@ -48,13 +49,13 @@ public:
 	using StackType = Stack<Slot, StackManipulationCallbacks>;
 	using StackData = StackType::Data;
 
-	static ControlFlowLayout generate(ControlFlowLiveness const& _controlFlowLiveness);
-	static SSACFGStackLayout generate(SSACFGLiveness const& _cfgLiveness);
+	// static ControlFlowLayout generate(ControlFlowLiveness const& _controlFlowLiveness);
+	static SSACFGStackLayout generate(SSACFGLiveness const& _cfgLiveness, SSACFGJunkBlockFinder const& _junkBlockFinder);
 
 private:
 	static void handlePhiFunctions(StackData& _stackData, ReversePhiFunctionTransform const& _phiInverse, SSACFGLiveness::LivenessData const& _liveness);
 
-	explicit StackLayoutGenerator(SSACFGLiveness const& _liveness);
+	explicit StackLayoutGenerator(SSACFGLiveness const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder);
 
 	SSACFGStackLayout const& computeStackLayout();
 	void defineStackIn(SSACFG::BlockId const& _blockId);
@@ -65,7 +66,7 @@ private:
 
 	std::vector<bool> m_blockIsGenerated;
 	std::vector<bool> m_blockHasStackInDefined;
-	SSACFGJunkBlockFinder m_junkBlockFinder;
+	SSACFGJunkBlockFinder const& m_junkBlockFinder;
 
 	SSACFGStackLayout m_stackLayout;
 };

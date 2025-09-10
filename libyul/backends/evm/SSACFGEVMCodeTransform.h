@@ -22,6 +22,7 @@
 #include <libyul/backends/evm/ControlFlow.h>
 #include <libyul/backends/evm/SSAControlFlowGraph.h>
 #include <libyul/backends/evm/SSACFGStackLayout.h>
+#include <libyul/backends/evm/SSACFGJunkBlockFinder.h>
 #include <libyul/AST.h>
 #include <libyul/Exceptions.h>
 #include <libyul/Scope.h>
@@ -145,6 +146,8 @@ private:
 	AbstractAssembly& m_assembly;
 	BuiltinContext& m_builtinContext;
 	SSACFG const& m_cfg;
+	SSACFGLiveness const& m_liveness;
+	SSACFGJunkBlockFinder m_junkBlockFinder;
 	SSACFGStackLayout const m_stackLayout;
 	std::vector<StackTooDeepError> m_stackErrors;
 	AssemblyCallbacks m_assemblyCallbacks;

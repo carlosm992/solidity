@@ -1,11 +1,13 @@
 #pragma once
 
+#include <libyul/backends/evm/SSACFGLiveness.h>
+#include <libyul/backends/evm/SSACFGStack.h>
+
 #include "range/v3/algorithm/equal.hpp"
 #include "range/v3/algorithm/find.hpp"
 #include "range/v3/view/iota.hpp"
-
-
-#include <libyul/backends/evm/ssa/StackLayoutGenerator.h>
+#include "range/v3/view/drop.hpp"
+#include "range/v3/view/take.hpp"
 
 #include <range/v3/algorithm/none_of.hpp>
 #include <range/v3/range_concepts.hpp>
@@ -32,10 +34,9 @@ std::map<Slot, size_t> histogram(Slots const& _slots)
 }
 }
 
-template<size_t ReachableStackDepth=16>
+template<typename Stack, size_t ReachableStackDepth=16>
 class OperationForwardShuffler
 {
-	using Stack = StackLayoutGenerator::StackType;
 	using Slot = Stack::Slot;
 
 public:
@@ -51,7 +52,7 @@ public:
 		constexpr std::size_t maxIterations = 1000;
 		std::size_t i = 0;
 		for (; i < maxIterations && shuffleStep(_stack, _args, _liveOut, _generateJunk); ++i) {}
-		yulAssert(i < maxIterations, "Maximum iterations reached");
+		yulAssert(i < maxIterations, fmt::format("Maximum iterations reached on {}", stackToString(_stack.data())));
 	}
 
 private:
@@ -323,14 +324,14 @@ private:
 					}
 				yulAssert(false);
 			}
-			yulAssert(ops.stackAdmissible());
+			yulAssert(ops.stackAdmissible(), fmt::format("No admissible stack reached: {}", stackToString(_stack.data())));
 			return false;
 		}
 
 		yulAssert(!_args.empty(), "From here on out, we need slots to be required in the top. Otherwise we should've terminated already.");
 
 		// If we no longer need the current stack top, we pop it
-		if (!_stack.empty() && ops.canBePopped(_stack.top()) && !std::holds_alternative<JunkSlot>(_stack.top()))
+		if (!_stack.empty() && ops.stackStats.argsCount(_stack.top()) > ops.targetArgsCount(_stack.top()) && !ops.isArgsCompatible(0, 0) && !ops.requiredInTail(_stack.top()) && !std::holds_alternative<JunkSlot>(_stack.top()))
 		{
 			// fmt::print(">>> POP\n");
 			_stack.pop();
@@ -338,7 +339,7 @@ private:
 		}
 
 		// the top is either required in args or in tail or is junk or the stack is empty
-		yulAssert(_stack.empty() || std::holds_alternative<JunkSlot>(_stack.top()) || ops.stackStats.argsCount(_stack.top()) > 0 || ops.stackStats.tailCount(_stack.top()) > 0);
+		yulAssert(_stack.empty() || std::holds_alternative<JunkSlot>(_stack.top()) || ops.stackStats.argsCount(_stack.top()) > 0 || ops.stackStats.tailCount(_stack.top()) > 0 || ops.isArgsCompatible(0, 0));
 
 		// if the top is junk and popping it fixes more positions in args than not popping it, pop it, next step
 		if (!_stack.empty() && std::holds_alternative<JunkSlot>(_stack.top()))

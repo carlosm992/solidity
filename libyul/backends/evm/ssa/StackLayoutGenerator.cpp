@@ -103,34 +103,34 @@ void junkShuffler(StackLayoutGenerator::StackType& _stack)
 
 }
 
-StackLayoutGenerator::StackLayoutGenerator(SSACFGLiveness const& _liveness):
+StackLayoutGenerator::StackLayoutGenerator(SSACFGLiveness const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder):
 	m_liveness(_liveness),
 	m_cfg(_liveness.cfg()),
 	m_blockIsGenerated(m_cfg.numBlocks(), false),
 	m_blockHasStackInDefined(m_cfg.numBlocks(), false),
-	m_junkBlockFinder(_liveness.cfg(), _liveness.topologicalSort())
+	m_junkBlockFinder(_junkBlockFinder)
 {
 	m_stackLayout.blockLayouts.resize(m_cfg.numBlocks());
 }
 
-ControlFlowLayout StackLayoutGenerator::generate(ControlFlowLiveness const& _controlFlowLiveness)
-{
-	ControlFlowLayout layout;
-	layout.mainLayout = generate(*_controlFlowLiveness.mainLiveness);
+// ControlFlowLayout StackLayoutGenerator::generate(ControlFlowLiveness const& _controlFlowLiveness)
+// {
+// 	ControlFlowLayout layout;
+// 	layout.mainLayout = generate(*_controlFlowLiveness.mainLiveness);
+//
+// 	layout.functionLayouts.reserve(_controlFlowLiveness.functionLiveness.size());
+// 	for (auto const& functionLiveness: _controlFlowLiveness.functionLiveness)
+// 		layout.functionLayouts.push_back(generate(*functionLiveness));
+//
+// 	return layout;
+// }
 
-	layout.functionLayouts.reserve(_controlFlowLiveness.functionLiveness.size());
-	for (auto const& functionLiveness: _controlFlowLiveness.functionLiveness)
-		layout.functionLayouts.push_back(generate(*functionLiveness));
-
-	return layout;
-}
-
-SSACFGStackLayout StackLayoutGenerator::generate(SSACFGLiveness const& _cfgLiveness)
+SSACFGStackLayout StackLayoutGenerator::generate(SSACFGLiveness const& _cfgLiveness, SSACFGJunkBlockFinder const& _junkBlockFinder)
 {
 	if constexpr (debugOutput)
 		std::cout << "stack layout for "
 				  << (_cfgLiveness.cfg().function ? _cfgLiveness.cfg().function->name.str() : "main graph") << '\n';
-	return StackLayoutGenerator{_cfgLiveness}.computeStackLayout();
+	return StackLayoutGenerator{_cfgLiveness, _junkBlockFinder}.computeStackLayout();
 }
 void StackLayoutGenerator::handlePhiFunctions(StackData& _stackData, ReversePhiFunctionTransform const& _phiInverse, SSACFGLiveness::LivenessData const& _liveness)
 {
@@ -365,7 +365,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		// declareJunk(stack, opLiveOutWithoutOutputs );
 		if constexpr(debugOutput)
 			std::cout << "{ " << stackToString(std::vector(liveOutWithoutOutputs.begin(), liveOutWithoutOutputs.end()), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ") -> " << std::flush;
-		OperationForwardShuffler<>::shuffle(stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
+		OperationForwardShuffler<StackType>::shuffle(stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
 		/*if (!m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId))
 		{
 			if constexpr(debugOutput)

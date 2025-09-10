@@ -17,6 +17,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 
+#include "ssa/OperationForwardShuffler.h"
+
+
 #include <libyul/backends/evm/SSACFGEVMCodeTransform.h>
 
 #include <libyul/backends/evm/ssa/StackLayoutGenerator.h>
@@ -138,7 +141,9 @@ SSACFGEVMCodeTransform::SSACFGEVMCodeTransform
 	m_assembly(_assembly),
 	m_builtinContext(_builtinContext),
 	m_cfg(_cfg),
-	m_stackLayout(StackLayoutGenerator::generate(_liveness)),
+	m_liveness(_liveness),
+	m_junkBlockFinder(_cfg, _liveness.topologicalSort()),
+	m_stackLayout(StackLayoutGenerator::generate(_liveness, m_junkBlockFinder)),
 	m_assemblyCallbacks{
 		.cfg = &_cfg,
 		.assembly = &_assembly,
@@ -185,6 +190,7 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 	yulAssert(m_cfg.block(_block).operations.size() == blockLayout.operationIn.size(), "We need as many stack layouts as we have operations");
 
 	// for each op with respective live-out, descend into op
+	size_t operationIndex = 0;
 	for (auto const& [operation, operationStackIn]: ranges::views::zip( m_cfg.block(_block).operations, blockLayout.operationIn))
 	{
 		bool const hasReturnLabel = std::holds_alternative<SSACFG::Call>(operation.kind)
@@ -203,7 +209,22 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			), operation.kind);
 			std::cout << "\t\t" << operationName << ": " << stackToString(m_stack.data(), m_cfg) << " -> " << stackToString(operationStackIn, m_cfg) << std::endl;
 		}
-		DanielShuffler<SSACFGStack>::shuffle(m_stack, {}, operationStackIn);
+		if (false)
+		{
+			std::vector<Slot> requiredStackTop;
+			if (auto const* call = std::get_if<SSACFG::Call>(&operation.kind))
+				if (call->canContinue)
+					requiredStackTop.emplace_back(FunctionReturnLabel{&call->call.get()});
+			SSACFGLiveness::LivenessData opLiveOut = m_liveness.operationsLiveOut(_block)[operationIndex];
+			auto opLiveOutWithoutOutputs = opLiveOut;
+			for (auto const& output: operation.outputs)
+				opLiveOutWithoutOutputs.erase(output);
+			requiredStackTop += operation.inputs;
+			OperationForwardShuffler<SSACFGStack>::shuffle(m_stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_block));
+
+		}
+		else
+			DanielShuffler<SSACFGStack>::shuffle(m_stack, {}, operationStackIn);
 
 		// Assert that we have the inputs of the operation on stack top.
 		yulAssert(m_stack.size() >= operation.inputs.size() + (hasReturnLabel ? 1 : 0));
@@ -241,6 +262,7 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			static_cast<int>(m_stack.size()) == m_assembly.stackHeight(),
 			fmt::format("symbolic stack size = {} =/= {} = assembly stack height", m_stack.size(), m_assembly.stackHeight())
 		);
+		++operationIndex;
 	}
 
 	util::GenericVisitor exitVisitor{
