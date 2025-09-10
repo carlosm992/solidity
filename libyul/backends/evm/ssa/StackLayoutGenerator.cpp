@@ -384,20 +384,23 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		m_stackLayout[_blockId].operationIn.push_back(currentStackData);
 
 		if constexpr(debugOutput)
+		{
 			#if !defined(NDEBUG)
 			StackManipulationCallbacks::writeCallbackOutput = false;
 			#endif
+		}
 		for (size_t i = 0; i < requiredStackTop.size(); ++i)
 			stack.pop();
 		for (auto const& val: operation.outputs)
 			stack.push(val);
+
 		if constexpr(debugOutput)
+		{
 			#if !defined(NDEBUG)
 			StackManipulationCallbacks::writeCallbackOutput = true;
 			#endif
-
-		if constexpr(debugOutput)
 			fmt::print(" -> {}\n", stackToString(currentStackData, m_cfg));
+		}
 	}
 
 	if (auto const* cjump = std::get_if<SSACFG::BasicBlock::ConditionalJump>(&block.exit))

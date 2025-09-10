@@ -234,15 +234,22 @@ private:
 				if ((neededInArgs && haveMoreAboveWithoutArgs) || (_generateJunk && haveMoreAbove))
 					continue;
 
-				bool const reachable = sourceDepth <= ReachableStackDepth;
+				bool const reachable = sourceDepth < ReachableStackDepth;
 
 				if (reachable)
+				{
 					if (!_ops.isArgsCompatible(0, 0))
+					{
 						// top needs to go into tail, swap it
 						_stack.swap(sourceDepth);
+					}
 					else
+					{
 						// we need more of slot, dup it
 						_stack.pushOrDup(slot);
+						return true;
+					}
+				}
 				else
 				{
 					// try compressing the stack, first looking at the top
