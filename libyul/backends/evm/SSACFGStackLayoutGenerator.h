@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include "ssa/ExactShuffler.h"
+
+
 #include <libyul/backends/evm/SSACFGJunkBlockFinder.h>
 #include <libyul/backends/evm/SSACFGStackLayout.h>
 #include <libyul/backends/evm/SSAControlFlowGraph.h>

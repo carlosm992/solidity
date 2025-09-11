@@ -3,13 +3,12 @@
 #include <libyul/backends/evm/SSACFGLiveness.h>
 #include <libyul/backends/evm/SSACFGStack.h>
 
-#include "range/v3/algorithm/equal.hpp"
-#include "range/v3/algorithm/find.hpp"
-#include "range/v3/view/iota.hpp"
-#include "range/v3/view/drop.hpp"
-#include "range/v3/view/take.hpp"
-
+#include <range/v3/algorithm/equal.hpp>
+#include <range/v3/algorithm/find.hpp>
 #include <range/v3/algorithm/none_of.hpp>
+#include <range/v3/view/drop.hpp>
+#include <range/v3/view/iota.hpp>
+#include <range/v3/view/take.hpp>
 #include <range/v3/range_concepts.hpp>
 
 #include <cstdint>
@@ -362,7 +361,39 @@ private:
 		if (!_stack.empty() && !ops.isArgsCompatible(0, 0) && ops.stackStats.argsCount(_stack.top()) <= ops.targetArgsCount(_stack.top()))
 		{
 			yulAssert(ops.args.size() > 1);
-			// todo shortcut
+
+			// shortcut
+			{
+				// if the top is required in the second slot position and we require something at the top that isn’t
+				// already sufficiently often in the args section and (we can introduce junk or the target top is also
+				// required for the tail), try duping a deeper element
+
+				if (_args.size() > 1 && ops.isArgsCompatible(0, 1))
+				{
+					if ((false || ops.requiredInTail(_args.back())) && ops.stackStats.argsCount(_args.back()) < ops.targetArgsCount(_args.back())) //
+					{
+						// dup up whatever wants to be at the top
+						for (size_t depth = 1; depth < ReachableStackDepth && depth < _stack.size(); ++depth)
+							if (ops.isArgsCompatible(depth, 0))
+							{
+								if (!dupDeepSlotIfRequired(ops, _stack, _generateJunk))
+								{
+									_stack.dup(_stack.slot(depth));
+									return true;
+								}
+							}
+						if (_stack.canBeFreelyGenerated(_args.back()))
+						{
+							if (!dupDeepSlotIfRequired(ops, _stack, _generateJunk))
+							{
+								_stack.push(_args.back());
+								return true;
+							}
+						}
+					}
+				}
+			}
+
 			// try finding a reachable out-of-position target position that, if swapped to, also fixes the top
 			for (size_t depth = 1; depth < std::min(_stack.size(), ops.args.size()); ++depth)
 				if (ops.isArgsCompatible(depth, 0) && ops.isArgsCompatible(0, depth) && !ops.isArgsCompatible(depth, depth))

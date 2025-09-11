@@ -17,6 +17,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 
+#include "ssa/ExactShuffler.h"
 #include "ssa/OperationForwardShuffler.h"
 
 
@@ -56,15 +57,6 @@ std::vector<StackTooDeepError> SSACFGEVMCodeTransform::run(
 	BuiltinContext& _builtinContext,
 	UseNamedLabels _useNamedLabelsForFunctions)
 {
-	if constexpr (debugOutput)
-	{
-		std::cout << "\n\n\n";
-		std::cout << "--------------------\n";
-		std::cout << "Running SSACFGEVMCodeTransform" << std::endl;
-		std::cout << "--------------------\n";
-		fmt::print("{}\n", _liveness.toDot());
-		std::fflush(nullptr);
-	}
 	auto const& controlFlow = _liveness.controlFlow.get();
 	auto functionLabels = registerFunctionLabels(_assembly, controlFlow, _useNamedLabelsForFunctions);
 
@@ -75,6 +67,15 @@ std::vector<StackTooDeepError> SSACFGEVMCodeTransform::run(
 		*controlFlow.mainGraph,
 		*_liveness.mainLiveness
 	);
+	if constexpr (debugOutput)
+	{
+		std::cout << "\n\n\n";
+		std::cout << "--------------------\n";
+		std::cout << "Running SSACFGEVMCodeTransform" << std::endl;
+		std::cout << "--------------------\n";
+		fmt::print("{}\n", _liveness.toDot(&mainCodeTransform.m_stackLayout));
+		std::fflush(nullptr);
+	}
 
 	mainCodeTransform(controlFlow.mainGraph->entry);
 
@@ -418,20 +419,10 @@ void SSACFGEVMCodeTransform::assertLayoutCompatibility(StackData const& _current
 		);
 }
 
-void SSACFGEVMCodeTransform::shuffleStack(std::vector<Slot> _target, std::optional<SSACFG::Edge> const& _edge)
+void SSACFGEVMCodeTransform::shuffleStack(std::vector<Slot> const& _target, std::optional<SSACFG::Edge> const& _edge)
 {
-	auto const transform = _edge ? ReversePhiFunctionTransform(m_cfg, _edge->from, _edge->to) : ReversePhiFunctionTransform{};
-	auto const transformedTarget = [&]
-	{
-		if (transform.noOp())
-			return _target;
-		return _target | ranges::views::transform(transform) | ranges::to<std::vector>;
-	}();
-	DanielShuffler<SSACFGStack>::shuffle(
-		m_stack,
-		{}, transformedTarget
-	);
-	assertLayoutCompatibility(m_stack.data(), transformedTarget);
+	ssa::shuffleStack(m_stack, _target, m_cfg, _edge);
+	// todo assertLayoutCompatibility(m_stack.data(), transformedTarget);
 	//yulAssert(transformedTarget == m_stack.stackData());
 	m_stackData = _target;
 }

@@ -1,6 +1,9 @@
+#include "AStarShuffler.h"
+#include "ExactShuffler.h"
 #include "libyul/backends/evm/SSACFGLiveness.h"
 #include "libyul/backends/evm/SSACFGStackShuffler.h"
 #include "range/v3/algorithm/equal.hpp"
+#include "range/v3/algorithm/min_element.hpp"
 #include "range/v3/algorithm/none_of.hpp"
 #include "range/v3/algorithm/replace.hpp"
 #include "range/v3/algorithm/sort.hpp"
@@ -17,6 +20,8 @@ using namespace solidity::yul::ssa;
 
 #if !defined(NDEBUG)
 bool StackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = true;
+#else
+bool StackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = false;
 #endif
 
 namespace
@@ -294,10 +299,40 @@ void StackLayoutGenerator::defineStackIn(SSACFG::BlockId const& _blockId)
 			}
 			// Case 3: Skip! (no "bottom" needed)
 		}*/
-		m_stackLayout[_blockId].stackIn = *parentExits[0].second;
+		std::vector<size_t> cumulativeCosts(parentExits.size(), 1e12);
+		for (size_t i = 0; i < parentExits.size(); ++i)
+		{
+			if (!parentExits[i].second)
+				continue;
+			size_t cumulativeCost = 0;
+			auto referenceStackIn = *parentExits[i].second;
+			{
+				StackType stack(referenceStackIn, {}, {&m_cfg});
+				declareJunk(stack, liveIn);
+			}
+			handlePhiFunctions(referenceStackIn, ReversePhiFunctionTransform(m_cfg, parentExits[i].first, _blockId), liveIn);
+			for (size_t j = 0; j < parentExits.size(); ++j)
+			{
+				if (j != i)
+				{
+					if (parentExits[j].second != nullptr)
+					{
+						auto otherStackIn = *parentExits[j].second;
+						StackType stack(otherStackIn, {}, {&m_cfg});
+						shuffleStack(stack, referenceStackIn, m_cfg, SSACFG::Edge{parentExits[j].first, _blockId});
+						cumulativeCost += stack.callbacks().numOps;
+					}
+				}
+			}
+			cumulativeCosts[i] = cumulativeCost;
+		}
+		auto argMin = std::distance(cumulativeCosts.begin(), ranges::min_element(cumulativeCosts));
+		yulAssert(parentExits[argMin].second);
+		// fmt::print(">> ARGMIN: {} (out of {})\n", argMin, cumulativeCosts.size());
+		m_stackLayout[_blockId].stackIn = *parentExits[argMin].second;
 		StackType stack(m_stackLayout[_blockId].stackIn, {}, {&m_cfg});
 		declareJunk(stack, liveIn);
-		handlePhiFunctions(m_stackLayout[_blockId].stackIn, ReversePhiFunctionTransform(m_cfg, parentExits[0].first, _blockId), liveIn);
+		handlePhiFunctions(m_stackLayout[_blockId].stackIn, ReversePhiFunctionTransform(m_cfg, parentExits[argMin].first, _blockId), liveIn);
 		//m_stackLayout[_blockId].stackIn = unifiedStack | ranges::views::reverse | ranges::to<std::vector>;
 	}
 
@@ -366,6 +401,31 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		if constexpr(debugOutput)
 			std::cout << "{ " << stackToString(std::vector(liveOutWithoutOutputs.begin(), liveOutWithoutOutputs.end()), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ") -> " << std::flush;
 		OperationForwardShuffler<StackType>::shuffle(stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
+		/*static auto constexpr compat = [](Slot const& _source, Slot const& _target)
+		{
+			return std::holds_alternative<ssa::JunkSlot>(_target) || _source == _target;
+		};
+		auto const fun = [&](Slot const& _slot) -> bool
+		{
+			if (auto const* valueId = std::get_if<SSACFG::ValueId>(&_slot))
+				return !liveOutWithoutOutputsSet.contains(*valueId);
+			return false;
+		};
+		auto tail = stack.data();
+		if (!m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId))
+		{
+			std::erase_if(tail, fun);
+			BlockForwardAStarShuffler<StackType, slotIsCompatible>::shuffle(stack, tail, requiredStackTop);
+		}
+		else
+		{
+			for (auto& slot: tail)
+				if (fun(slot))
+					slot = ssa::JunkSlot{};
+			for (auto const& slot: requiredStackTop)
+				yulAssert(!std::holds_alternative<ssa::JunkSlot>(slot));
+			BlockForwardAStarShuffler<StackType, slotIsCompatible>::shuffle(stack, tail, requiredStackTop);
+		}*/
 		/*if (!m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId))
 		{
 			if constexpr(debugOutput)
@@ -421,13 +481,13 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		declareJunk(stack, commonLiveOut);
 		// pop everything not in the combined pre image
 		// we can ignore the phi function pre-image slots because they are definitely in the combined liveness
-		while (
+		/*while (
 			stack.size() > 0 &&
 			std::holds_alternative<SSACFG::ValueId>(stack.top()) &&
 			!commonLiveOut.contains(std::get<SSACFG::ValueId>(stack.top()))
 		)
-			stack.pop();
-		for (auto it = stack.data().rbegin(); it != stack.data().rend(); ++it)
+			stack.pop();*/
+		/*for (auto it = stack.data().rbegin(); it != stack.data().rend(); ++it)
 		{
 			if (std::holds_alternative<SSACFG::ValueId>(*it) && !commonLiveOut.contains(std::get<SSACFG::ValueId>(*it)))
 			{
@@ -437,7 +497,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 					stack.swap(depth);
 				stack.pop();
 			}
-		}
+		}*/
 	}
 
 	m_stackLayout[_blockId].stackOut = currentStackData;

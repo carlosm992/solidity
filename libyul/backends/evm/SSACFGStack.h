@@ -253,6 +253,8 @@ public:
 		return m_canBeFreelyGenerated;
 	}
 
+	Callbacks const& callbacks() const { return m_callbacks; }
+
 private:
 	Data* m_data;
 	Callbacks m_callbacks;

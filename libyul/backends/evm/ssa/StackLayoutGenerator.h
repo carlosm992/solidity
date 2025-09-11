@@ -16,36 +16,36 @@ class StackLayoutGenerator
 
 public:
 	using Slot = StackSlot;
-#if !defined(NDEBUG)
 	struct StackManipulationCallbacks
 	{
 		static bool writeCallbackOutput;
-		static size_t numOps;
+		size_t numOps = 0;
 		using Slot = Slot;
-		static void swap(size_t _depth)
+		void swap(size_t _depth)
 		{
+			++numOps;
 			if (writeCallbackOutput)
 				std::cout << "SWAP" << _depth << std::flush << " + ";
 		}
-		static void dup(size_t _depth)
+		void dup(size_t _depth)
 		{
+			++numOps;
 			if (writeCallbackOutput)
 				std::cout << "DUP" << _depth << std::flush << " + ";
 		}
-		static void push(Slot const& _slot)
+		void push(Slot const& _slot)
 		{
+			++numOps;
 			if (writeCallbackOutput)
 				std::cout << "PUSH " << slotToString(_slot) << std::flush << " + ";
 		}
-		static void pop()
+		void pop()
 		{
+			++numOps;
 			if (writeCallbackOutput)
 				std::cout << "POP" << std::flush << " + ";
 		}
 	};
-#else
-	using StackManipulationCallbacks = NoOpStackManipulationCallbacks<StackSlot>;
-#endif
 	using StackType = Stack<Slot, StackManipulationCallbacks>;
 	using StackData = StackType::Data;
 

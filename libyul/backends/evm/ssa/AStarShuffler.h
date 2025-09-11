@@ -388,8 +388,6 @@ private:
 				size_t n = 0;
 				for (size_t i = 0; i < _state.stackData.size(); ++i)
 				{
-					if (n == 2)
-						break;
 					// if we have too much of it, we may declare it junk
 					if (std::holds_alternative<SSACFG::ValueId>(_state.stackData[i]) && _targetState.numSlot(_state.stackData[i]) < _state.numSlot(_state.stackData[i]))
 					{
@@ -519,7 +517,7 @@ public:
 	static void shuffle(Stack& _stack, std::vector<Slot> const& _targetTail, std::vector<Slot> const& _targetHead)
 	{
 		// Check for common pattern: tail histogram identical, need to build head via DUPs
-		if (_stack.data().size() >= _targetTail.size())
+		if (false && _stack.data().size() >= _targetTail.size())
 		{
 			// Compare histograms of current stack and target tail
 			std::map<Slot, size_t> currentHistogram, targetHistogram;

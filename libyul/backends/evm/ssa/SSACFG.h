@@ -41,6 +41,10 @@
 
 namespace solidity::yul::ssa
 {
+struct SSACFGStackLayout;
+}
+namespace solidity::yul
+{
 class LivenessAnalysis;
 
 class SSACFG
@@ -278,7 +282,8 @@ public:
 	std::string toDot(
 		bool _includeDiGraphDefinition=true,
 		std::optional<size_t> _functionIndex=std::nullopt,
-		LivenessAnalysis const* _liveness=nullptr
+		LivenessAnalysis const* _liveness=nullptr,
+		ssa::SSACFGStackLayout const* _stackLayout=nullptr
 	) const;
 
 	PhiValue const& phiInfo(ValueId const& _valueId) const
