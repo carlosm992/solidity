@@ -192,6 +192,14 @@ private:
 			return _sourceDepth1 < stack.size() && _sourceDepth2 < stack.size() && stack.slot(_sourceDepth1) == stack.slot(_sourceDepth2);
 		}
 
+		bool needsMoreSlots() const
+		{
+			for (auto const& arg: args)
+				if (stackStats.totalCount(arg) < targetMinCount(arg))
+					return true;
+			return false;
+		}
+
 		StackStats stackStats;
 		std::map<Slot, size_t> targetMinCounts;
 		Stack const& stack;
@@ -359,18 +367,33 @@ private:
 			}
 		}
 
-		// if the top is out of position and required in args
-		if (!_stack.empty() && !ops.isArgsCompatible(0, 0) && ops.stackStats.argsCount(_stack.top()) <= ops.targetArgsCount(_stack.top()))
+		// if there is any slot that we need more of (in args), dup/push it now
+		for (auto const& arg: _args)
 		{
-			yulAssert(ops.args.size() > 1);
+			if (ops.targetMinCount(arg) > ops.stackStats.totalCount(arg))
+			{
+				if (!dupDeepSlotIfRequired(ops, _stack, _generateJunk))
+				{
+					_stack.pushOrDup(arg);
+					return true;
+				}
+			}
+		}
 
+		// if the top is out of position and required in args
+		if (
+			!_stack.empty() &&
+			!ops.isArgsCompatible(0, 0) &&
+			ops.stackStats.argsCount(_stack.top()) <= ops.targetArgsCount(_stack.top())
+		)
+		{
 			// shortcut
 			{
 				// if the top is required in the second slot position and we require something at the top that isn’t
 				// already sufficiently often in the args section and (we can introduce junk or the target top is also
 				// required for the tail), try duping a deeper element
 
-				if (_args.size() > 1 && ops.isArgsCompatible(0, 1))
+				if (ops.isArgsCompatible(0, 1) && !ops.needsMoreSlots())
 				{
 					if ((false || ops.requiredInTail(_args.back())) && ops.stackStats.argsCount(_args.back()) < ops.targetArgsCount(_args.back())) //
 					{
