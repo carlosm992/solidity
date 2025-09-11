@@ -99,9 +99,16 @@ BOOST_AUTO_TEST_CASE(yo)
 	SlotCanBeFreelyGenerated canBeFreelyGenerated{.canBeFreelyGenerated = {cfg.get()}};
 	stack = std::make_shared<TestStack>(slots, callback, canBeFreelyGenerated);
 
-	std::cout << "--- start shuffle ---" << std::endl;
+	std::cout << fmt::format("--- start shuffle with {} ---", ssa::stackToString(stack->data(), *cfg)) << std::endl;
 	SSACFGLiveness::LivenessData liveness ({{v0, 1}, {v19, 1}});
-	ssa::OperationForwardShuffler<TestStack>::shuffle(*stack, {lit, v19}, liveness, false);
+	TestStack::Data args{lit, v19};
+	std::cout << ">>> target: { ";
+	auto const t = ranges::views::transform([&](TestStack::Slot const& k) { return ssa::slotToString(k, *cfg); });
+	auto r = liveness | ranges::views::keys | t;
+	std::cout << fmt::format("{}", fmt::join(r, ", "));
+	std::cout << " } + ";
+	std::cout << fmt::format("[ {} ]\n", fmt::join(args | t, ", "));
+	ssa::OperationForwardShuffler<TestStack>::shuffle(*stack, args, liveness, false);
 	std::cout << "--- fin ---" << std::endl;
 	std::cout << ssa::stackToString(stack->data(), *cfg) << std::endl;
 }

@@ -55,27 +55,29 @@ public:
 	}
 
 private:
-	static size_t loss(Stack const& _stack, std::vector<Slot> const& _args, SSACFGLiveness::LivenessData const& _liveOut)
+	static std::ptrdiff_t loss(Stack::Data const& _stackData, std::vector<Slot> const& _args, SSACFGLiveness::LivenessData const& _liveOut)
 	{
-		// todo this could also be a max overlap plus the depth of the overlap
-		size_t value = 0;
-		for (size_t depth = 0; depth < _args.size(); ++depth)
-			value += depth >= _stack.size() || _stack.slot(depth) != _args[_args.size() - 1 - depth];
+		std::ptrdiff_t result = 0;
 
-		// todo this is unidirectional, i should also take the stuff into account that is currently on stack but shouldnt be
-		for (SSACFG::ValueId const& liveValue: _liveOut | ranges::views::keys)
+		// every correct slot in the args gets a plus, every incorrect/missing one a minus
+		for (size_t i = 0; i < _args.size(); ++i)
+			if (_stackData.size() > i && _stackData[_stackData.size() - i - 1] == _args[_args.size() - i - 1])
+				++result;
+			else
+				--result;
+		for (auto const& [liveOutValue, _]: _liveOut)
 		{
-			bool found = false;
-			if (_stack.size() >= _args.size())
-				for (size_t depth = _args.size(); depth < _stack.size(); ++depth)
-					if (_stack.slot(depth) == Slot{liveValue})
-					{
-						found = true;
-						break;
-					}
-			value += _stack.size() < _args.size() || !found;
+			if (_stackData.size() < _args.size())
+				--result;
+
+			auto it = ranges::find(_stackData | ranges::views::reverse | ranges::views::drop(_args.size()), liveOutValue);
+			if (it == ranges::end(_stackData))
+				--result;
+			else
+				++result;
 		}
-		return value;
+
+		return result;
 	}
 
 	struct StackStats
@@ -393,6 +395,15 @@ private:
 					}
 				}
 			}
+
+			// if we need more of whatever goes to the top and it's reachable, just dup it
+			if (ops.targetMinCount(_args.back()) > ops.stackStats.totalCount(_args.back()))
+				if (auto const depth = _stack.slotDepth(_args.back()))
+					if (*depth < ReachableStackDepth)
+					{
+						_stack.dup(_args.back());
+						return true;
+					}
 
 			// try finding a reachable out-of-position target position that, if swapped to, also fixes the top
 			for (size_t depth = 1; depth < std::min(_stack.size(), ops.args.size()); ++depth)
