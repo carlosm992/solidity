@@ -329,7 +329,7 @@ private:
 					auto const& elementToSwap = _state.stackData[_state.stackData.size() - i - 1];
 
 					// Only generate SWAP if this element is needed in the head
-					if (_targetState.headContains(elementToSwap) || (!_targetState.headContains(elementToSwap) && _state.headContains(elementToSwap)))
+					if (true || _targetState.headContains(elementToSwap) || (!_targetState.headContains(elementToSwap) && _state.headContains(elementToSwap)))
 					{
 						result.emplace_back(_state, Operation{Operation::Type::SWAP, i, std::nullopt});
 						auto& state = std::get<0>(result.back());
@@ -344,14 +344,8 @@ private:
 				std::vector<std::pair<size_t, Slot>> candidates;
 				for (size_t i = 1; i <= std::min(_state.stackData.size(), static_cast<size_t>(16)); ++i)
 				{
-					if (i <= _state.stackData.size())
-					{
-						auto const& slotToDup = _state.stackData[_state.stackData.size() - i];
-						if (_state.numSlot(slotToDup) < _targetState.numSlot(slotToDup))
-						{
-							candidates.emplace_back(i, slotToDup);
-						}
-					}
+					auto const& slotToDup = _state.stackData[_state.stackData.size() - i];
+					candidates.emplace_back(i, slotToDup);
 				}
 
 				// Sort by depth (deepest first) and only generate top 3 DUP operations
@@ -359,8 +353,8 @@ private:
 					return a.first > b.first; // Deeper elements first
 				});
 
-				size_t const maxDups = std::min(candidates.size(), static_cast<size_t>(2));
-				for (size_t j = 0; j < maxDups; ++j)
+				// size_t const maxDups = std::min(candidates.size(), static_cast<size_t>(2));
+				for (size_t j = 0; j < candidates.size(); ++j)
 				{
 					auto const& [depth, slotToDup] = candidates[j];
 					result.emplace_back(_state, Operation{Operation::Type::DUP, depth, slotToDup});
@@ -426,6 +420,7 @@ private:
 		Stack const& _inputStack
 	)
 	{
+		// std::cout << "Running A* on: " << ssa::stackToString(_initial) << " -> " << ssa::stackToString(_target) << std::endl;
 		yulAssert(_target.size() >= _numHead);
 		State const targetState (_target, _numHead);
 		State start (_initial, _numHead);
@@ -535,9 +530,12 @@ public:
 		}
 
 		// Fall back to A* for complex cases
-		auto const ops = shuffle(_stack.data(), _targetTail + _targetHead, _targetHead.size(), 100000000, 100000000, _stack);
+		Stack cpy(_stack);
+		auto const ops = shuffle(_stack.data(), _targetTail + _targetHead, _targetHead.size(), 100000000, 100000000, cpy);
 		for (auto const& op: ops)
+		{
 			op.apply(_stack);
+		}
 	}
 
 };

@@ -1,3 +1,4 @@
+#include "libyul/backends/evm/ssa/AStarShuffler.h"
 #include "libyul/backends/evm/ssa/OperationForwardShuffler.h"
 
 
@@ -15,36 +16,48 @@ namespace
 using SourceSlot = solidity::yul::ssa::StackSlot;
 struct PrintCallback
 {
-	PrintCallback(std::function<void()> _callback): callback(_callback) {}
+	PrintCallback(std::optional<std::function<void()>> _callback=std::nullopt): callback(_callback) {}
 
 	using Slot = SourceSlot;
 	void swap(size_t _depth)
 	{
 		++numOps;
-		fmt::print("swap {}: ", _depth);
-		callback();
+		if (callback)
+		{
+			fmt::print("swap {}: ", _depth);
+			(*callback)();
+		}
 	}
 	void dup(size_t _depth)
 	{
 		++numOps;
-		fmt::print("dup {}: ", _depth);
-		callback();
+		if (callback)
+		{
+			fmt::print("dup {}: ", _depth);
+			(*callback)();
+		}
 	}
 	void push(Slot const&)
 	{
 		++numOps;
-		fmt::print("push: ");
-		callback();
+		if (callback)
+		{
+			fmt::print("push: ");
+			(*callback)();
+		}
 	}
 	void pop()
 	{
 		++numOps;
-		fmt::print("pop: ");
-		callback();
+		if (callback)
+		{
+			fmt::print("pop: ");
+			(*callback)();
+		}
 	}
 
 	size_t numOps{};
-	std::function<void()> callback;
+	std::optional<std::function<void()>> callback;
 };
 
 struct SlotCanBeFreelyGenerated
@@ -81,6 +94,8 @@ BOOST_AUTO_TEST_CASE(yo)
 	auto const v4 = cfg->newVariable({0});
 	auto const v5 = cfg->newVariable({0});
 	auto const v6 = cfg->newVariable({0});
+	auto const v48 = cfg->newVariable({0});
+	auto const v49 = cfg->newVariable({0});
 	auto const v19 = cfg->newVariable({0});
 	auto const v98 = cfg->newVariable({0});
 	auto const v99 = cfg->newVariable({0});
@@ -92,7 +107,9 @@ BOOST_AUTO_TEST_CASE(yo)
 	auto const v77 = cfg->newVariable({0});
 	auto const v79 = cfg->newVariable({0});
 	auto const v188 = cfg->newVariable({0});
-	auto const lit = cfg->newLiteral(langutil::DebugData::create(), 42);
+	auto const zero = cfg->newLiteral(langutil::DebugData::create(), 0);
+	auto const two = cfg->newLiteral(langutil::DebugData::create(), 2);
+	auto const thirtytwo = cfg->newLiteral(langutil::DebugData::create(), 32);
 
 	std::shared_ptr<TestStack> stack;
 	PrintCallback callback([&stack, &cfg]
@@ -107,31 +124,59 @@ BOOST_AUTO_TEST_CASE(yo)
 		.functionName = Identifier{nullptr, YulString{"fun_deposit"}},
 		.arguments = {}
 	};
+	auto const v113 = cfg->newVariable({0});
+	auto const v115 = cfg->newVariable({0});
+	auto const v119 = cfg->newVariable({0});
+	auto const v136 = cfg->newVariable({0});
+	auto const v139 = cfg->newVariable({0});
+	auto const v141 = cfg->newVariable({0});
 
-	std::vector<SourceSlot> slots {
-		ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{},
-		v58, v59, ssa::JunkSlot{}, v67, v68, ssa::JunkSlot{}, v76, v77, v79
+	std::vector<SourceSlot> slotsRef {
+		// ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{},
+		v113, v115, v119, v136, /*ssa::JunkSlot{}, ssa::JunkSlot{},*/ v139, v141
 	};
-	stack = std::make_shared<TestStack>(slots, callback, canBeFreelyGenerated);
+	SSACFGLiveness::LivenessData liveness({{v113, 1}, {v115, 1}, {v119, 1}});
+	TestStack::Data args{thirtytwo, zero, v139, v136, two, v141};
+	std::vector<SourceSlot> final;
 
-	//   fun_deposit([JUNK x 6, v58, v59, JUNK, v67, v68, JUNK, v76, v77, v79] -> { [] } + [ReturnLabel[fun_deposit], v79, v77, v76, v68, v67, v59, v58])
-
-	std::cout << fmt::format("--- start shuffle with {} ---", ssa::stackToString(stack->data(), *cfg)) << std::endl;
-	//SSACFGLiveness::LivenessData liveness; // ({{v0, 1}, {v19, 1}});
-	SSACFGLiveness::LivenessData liveness ({{v79, 1}, {v68, 1}});
-	//TestStack::Data args{ssa::FunctionReturnLabel{&funDeposit}, v79, v77, v76, v68, v67, v59, v58};
-	TestStack::Data args{v79, v68};
 	{
-		auto const t = ranges::views::transform([&](TestStack::Slot const& k) { return ssa::slotToString(k, *cfg); });
-		auto r = liveness | ranges::views::keys | t;
-		std::cout
-			<< ">>> target: "
-			<< fmt::format("{{ {} }} + ", fmt::join(r, ", "))
-			<< fmt::format("[ {} ]\n", fmt::join(args | t, ", "));
+		auto slots = slotsRef;
+		stack = std::make_shared<TestStack>(slots, callback, canBeFreelyGenerated);
+
+		//   fun_deposit([JUNK x 6, v58, v59, JUNK, v67, v68, JUNK, v76, v77, v79] -> { [] } + [ReturnLabel[fun_deposit], v79, v77, v76, v68, v67, v59, v58])
+		// mstore([JUNK x 7, v48, v49] -> { [v49] } + [v48, v49]) -> DUP1 + SWAP2 + SWAP1 +  -> [JUNK x 7, v49]
+		// staticcall([JUNK x 5, v113, v115, v119, v136, JUNK, JUNK, v139, v141] -> { [v113, v115, v119] } + [32, 0, v139, v136, 2, v141]) -> PUSH v13 + PUSH v6 + PUSH v140 + SWAP1 + SWAP4 + SWAP3 + SWAP7 + SWAP2 + SWAP5 + SWAP7 +  -> [JUNK x 5, v113, v115, v119, JUNK, JUNK, v142]
+
+		std::cout << fmt::format("--- start shuffle with {} ---", ssa::stackToString(stack->data(), *cfg)) << std::endl;
+		// TestStack::Data args{v79, v68};
+		{
+			auto const t = ranges::views::transform([&](TestStack::Slot const& k) { return ssa::slotToString(k, *cfg); });
+			auto r = liveness | ranges::views::keys | t;
+			std::cout
+				<< ">>> target: "
+				<< fmt::format("{{ {} }} + ", fmt::join(r, ", "))
+				<< fmt::format("[ {} ]\n", fmt::join(args | t, ", "));
+		}
+		ssa::OperationForwardShuffler<TestStack>::shuffle(*stack, args, liveness, true);
+		std::cout << "--- fin ---" << std::endl;
+		std::cout << ssa::stackToString(stack->data(), *cfg) << std::endl;
+		final = stack->data();
 	}
-	ssa::OperationForwardShuffler<TestStack>::shuffle(*stack, args, liveness, true);
-	std::cout << "--- fin ---" << std::endl;
-	std::cout << ssa::stackToString(stack->data(), *cfg) << std::endl;
+	{
+		constexpr auto SlotIsCompatible = [](TestStack::Slot const& _source, TestStack::Slot const& _target) { return std::holds_alternative<ssa::JunkSlot>(_target) || _source == _target; };
+		auto slots = slotsRef;
+		stack = std::make_shared<TestStack>(slots, callback, canBeFreelyGenerated);
+		std::cout << fmt::format("\n\nAnd now with A*:\n") << std::flush;
+		TestStack::Data tail(final.begin(), final.begin() + static_cast<size_t>(final.size() - args.size()));
+		ssa::BlockForwardAStarShuffler<TestStack, SlotIsCompatible>::shuffle(*stack, tail, args);
+	}
+	{
+		auto slots = slotsRef;
+		stack = std::make_shared<TestStack>(slots, callback, canBeFreelyGenerated);
+
+		std::cout << fmt::format("\n\nAnd now with Daniel shuffler:\n") << std::flush;
+		DanielShuffler<TestStack>::shuffle(*stack, {}, final);
+	}
 }
 
 BOOST_AUTO_TEST_SUITE_END()

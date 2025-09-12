@@ -328,6 +328,14 @@ private:
 					if (ops.stackStats.totalCount(_stack.slot(depth)) < ops.targetMinCount(_stack.slot(depth)))
 					{
 						// todo what about literals? can they be in the tail?
+						// shortcut: if we need more of the top and we only have two args, we can get away with
+						// two ops
+						if (depth == 0 && _args.size() == 2)
+						{
+							_stack.swap(1);
+							_stack.dup(_stack.slot(1));
+							return true;
+						}
 						_stack.pushOrDup(_stack.slot(depth));
 						return true;
 					}

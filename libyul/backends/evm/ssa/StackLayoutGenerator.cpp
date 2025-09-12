@@ -31,10 +31,10 @@ bool constexpr debugOutput = true;
 #else
 bool constexpr debugOutput = false;
 #endif
-template<typename Slot>
-[[maybe_unused]] std::vector<Slot> pileOfJunk(size_t const _size)
+
+[[maybe_unused]] std::vector<StackLayoutGenerator::Slot> pileOfJunk(size_t const _size)
 {
-	return std::vector<Slot>(_size, ssa::JunkSlot{});
+	return std::vector<StackLayoutGenerator::Slot>(_size, ssa::JunkSlot{});
 }
 
 /*class IsSSACFGLiteral
@@ -58,6 +58,46 @@ void declareJunk(StackLayoutGenerator::StackType& _stack, SSACFGLiveness::Livene
 		if (auto const* valueId = std::get_if<SSACFG::ValueId>(&_stack.slot(depth)))
 			if (!_live.contains(*valueId))
 				_stack.declareJunk(depth);
+}
+
+void reduceStackToLiveness(StackLayoutGenerator::StackType& _stack, std::set<SSACFG::ValueId> const& _livenessPreImage, bool const _introduceJunk)
+{
+	// if we are allowed to introduce junk, we'll just declare everything in the stack tail that is not part of the liveness
+	// set as junk until we find something that has relevance. That way the stack closer to the top is kept compact
+	// and the end part can be safely discarded
+	if (_introduceJunk)
+		for (size_t i = 0; i < _stack.size(); ++i)
+		{
+			if (!std::holds_alternative<SSACFG::ValueId>(_stack[i]) && !std::holds_alternative<ssa::JunkSlot>(_stack[i]))
+				break;
+
+			if (auto const* valueSlot = std::get_if<SSACFG::ValueId>(&_stack[i]))
+			{
+				if (_livenessPreImage.contains(*valueSlot))
+					break;
+				_stack.declareJunk(_stack.size() - i - 1);
+			}
+		}
+
+	// pop everything not in the combined pre image
+	// we can ignore the phi function pre-image slots because they are definitely in the combined liveness
+	while (
+		_stack.size() > 0 &&
+		std::holds_alternative<SSACFG::ValueId>(_stack.top()) &&
+		!_livenessPreImage.contains(std::get<SSACFG::ValueId>(_stack.top()))
+	)
+		_stack.pop();
+	for (auto it = _stack.data().rbegin(); it != _stack.data().rend(); ++it)
+	{
+		if (std::holds_alternative<SSACFG::ValueId>(*it) && !_livenessPreImage.contains(std::get<SSACFG::ValueId>(*it)))
+		{
+			yulAssert(it != _stack.data().rbegin()); // this shouldn't happen as we have already popped everything up front
+			auto const depth = static_cast<std::size_t>(std::distance(_stack.data().rbegin(), it));
+			if (depth > 0)
+				_stack.swap(depth);
+			_stack.pop();
+		}
+	}
 }
 
 void junkShuffler(StackLayoutGenerator::StackType& _stack)
@@ -221,6 +261,9 @@ void StackLayoutGenerator::defineStackIn(SSACFG::BlockId const& _blockId)
 		m_blockHasStackInDefined[_blockId.value] = true;
 		return;
 	}
+
+	if (m_blockHasStackInDefined[_blockId.value])
+		return;
 
 	auto const& block = m_cfg.block(_blockId);
 
@@ -479,25 +522,70 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 
 		// mark all as junk that are not live
 		declareJunk(stack, commonLiveOut);
-		// pop everything not in the combined pre image
-		// we can ignore the phi function pre-image slots because they are definitely in the combined liveness
-		/*while (
-			stack.size() > 0 &&
-			std::holds_alternative<SSACFG::ValueId>(stack.top()) &&
-			!commonLiveOut.contains(std::get<SSACFG::ValueId>(stack.top()))
-		)
-			stack.pop();*/
-		/*for (auto it = stack.data().rbegin(); it != stack.data().rend(); ++it)
+
+		if (false)
 		{
-			if (std::holds_alternative<SSACFG::ValueId>(*it) && !commonLiveOut.contains(std::get<SSACFG::ValueId>(*it)))
+			auto const& sourceStack = currentStackData;
+			auto sourceJunkTailSize = junkTailSize(sourceStack);
+			std::vector sourceStackWithoutJunkTail(sourceStack.begin() + static_cast<std::ptrdiff_t>(sourceJunkTailSize), sourceStack.end());
+
+			const auto preImage = [&](
+				SSACFGLiveness::LivenessData const& _valueIds,
+				SSACFG::BlockId const& _from,
+				SSACFG::BlockId const& _to
+			)
 			{
-				yulAssert(it != stack.data().rbegin()); // this shouldn't happen as we have already popped everything up front
-				auto const depth = static_cast<std::size_t>(std::distance(stack.data().rbegin(), it));
-				if (depth > 0)
-					stack.swap(depth);
-				stack.pop();
+				return _valueIds | ranges::views::keys | ranges::views::transform(ReversePhiFunctionTransform(m_cfg, _from, _to)) | ranges::to<std::set>;
+			};
+
+			auto const pulledBackZeroLiveIn = preImage(zeroLiveIn, _blockId, cjump->zero);
+			auto const pulledBackNonZeroLiveIn = preImage(nonZeroLiveIn, _blockId, cjump->nonZero);
+
+			StackType conditionalJumpState (sourceStackWithoutJunkTail, {}, {&m_cfg});
+
+			if (!m_blockHasStackInDefined[cjump->nonZero.value])
+			{
+				//auto const pulledBackZeroLiveIn = zeroLiveIn | ranges::views::transform(ReversePhiFunctionTransform(m_cfg, _source, _condJump.zero)) | ranges::to<std::set>;
+
+				//auto const remainingZeroLiveIn = pulledBackZeroLiveIn - nonZeroLiveIn;
+				//std::vector<Slot> const remainingZeroLiveInSlots(remainingZeroLiveIn.begin(), remainingZeroLiveIn.end());
+
+				// [phi^-1(liveInZero) - liveInNonZero, liveInNonZero]
+				//auto const activeSet = nonZeroLiveIn + remainingZeroLiveIn;
+
+				// this will discard value ids if they overlap in their pre-images. but that is okay here because we don't
+				// use any information related to the phi value ids on the combined pre image
+				auto const combinedPreImage = pulledBackNonZeroLiveIn + pulledBackZeroLiveIn;
+
+				// pop everything not in the combined pre image
+				// we can ignore the phi function pre-image slots because they are definitely in the combined liveness
+				reduceStackToLiveness(conditionalJumpState, combinedPreImage, m_junkBlockFinder.blockAllowsAdditionOfJunk(cjump->zero) && m_junkBlockFinder.blockAllowsAdditionOfJunk(cjump->nonZero));
+
+				// add any phi function values here that are not already contained in the stack
+				{
+					auto stackInData = conditionalJumpState.data();
+					ReversePhiFunctionTransform const nonZeroPreImage(m_cfg, _blockId, cjump->nonZero);
+					handlePhiFunctions(stackInData, nonZeroPreImage, nonZeroLiveIn);
+					m_stackLayout[cjump->nonZero].stackIn = pileOfJunk(sourceJunkTailSize) + stackInData;
+				}
+
+				m_blockHasStackInDefined[cjump->nonZero.value] = true;
 			}
-		}*/
+
+			if (!m_blockHasStackInDefined[cjump->zero.value])
+			{
+				reduceStackToLiveness(conditionalJumpState, pulledBackZeroLiveIn, m_junkBlockFinder.blockAllowsAdditionOfJunk(cjump->zero));
+
+				// add any phi function values here that are not already contained in the stack
+				{
+					auto stackInData = conditionalJumpState.data();
+					ReversePhiFunctionTransform const zeroPreImage(m_cfg, _blockId, cjump->zero);
+					handlePhiFunctions(stackInData, zeroPreImage, zeroLiveIn);
+					m_stackLayout[cjump->zero].stackIn = pileOfJunk(sourceJunkTailSize) + stackInData;
+				}
+				m_blockHasStackInDefined[cjump->zero.value] = true;
+			}
+		}
 	}
 
 	m_stackLayout[_blockId].stackOut = currentStackData;
