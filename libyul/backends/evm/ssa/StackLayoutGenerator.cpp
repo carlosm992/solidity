@@ -2,6 +2,7 @@
 #include "ExactShuffler.h"
 #include "libyul/backends/evm/SSACFGLiveness.h"
 #include "libyul/backends/evm/SSACFGStackShuffler.h"
+#include "range/v3/algorithm/count.hpp"
 #include "range/v3/algorithm/equal.hpp"
 #include "range/v3/algorithm/min_element.hpp"
 #include "range/v3/algorithm/none_of.hpp"
@@ -185,7 +186,8 @@ void StackLayoutGenerator::handlePhiFunctions(StackData& _stackData, ReversePhiF
 		// yulAssert(nonZeroLiveIn.contains(phi));
 		// v = phi^{-1}(v_phi)
 		// auto const& preImage = nonZeroPreImage.data().at(phi);
-		auto it = ranges::find(_stackData, Slot{preImage});
+		auto reversedStackData = _stackData | ranges::views::reverse;
+		auto it = ranges::find(reversedStackData, Slot{preImage});
 		if (_liveness.contains(preImage))
 		{
 			// Both the phi function and the pre image are part of the live in set.
@@ -193,10 +195,10 @@ void StackLayoutGenerator::handlePhiFunctions(StackData& _stackData, ReversePhiF
 			// If so, one of them is symbolically replaced by the phi function;
 			// otherwise, we push the phi function value.
 			// We must have the pre image here at least once, otherwise it's an invalid dup
-			yulAssert(it != _stackData.end());
-			auto it2 = ranges::find(it + 1, _stackData.end(), Slot{preImage});
-			if(it2 != _stackData.end())
-				*it2 = phi;
+			// yulAssert(it != _stackData.end());
+			// auto it2 = ranges::find(_stackData.begin(), std::prev(it), Slot{preImage});
+			if(ranges::count(_stackData, Slot{preImage}) > 1)
+				*it = phi;
 			else
 				_stackData.emplace_back(phi);
 		}
@@ -205,7 +207,7 @@ void StackLayoutGenerator::handlePhiFunctions(StackData& _stackData, ReversePhiF
 			// replace all v with phi
 			ranges::replace(_stackData, Slot{preImage}, Slot{phi});
 			// if its not contained, push it (could be derived from a literal)
-			if (it == _stackData.end())
+			if (it == ranges::end(reversedStackData))
 				_stackData.emplace_back(phi);
 		}
 	}
