@@ -107,6 +107,8 @@ add_library(yul
 	backends/evm/ssa/Stack.h
 	backends/evm/ssa/AStarShuffler.cpp
 	backends/evm/ssa/AStarShuffler.h
+	backends/evm/ssa/BackwardStackLayoutGenerator.cpp
+	backends/evm/ssa/BackwardStackLayoutGenerator.h
 	backends/evm/ssa/ExactShuffler.cpp
 	backends/evm/ssa/ExactShuffler.h
 	backends/evm/ssa/OperationForwardShuffler.h

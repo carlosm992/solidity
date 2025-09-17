@@ -10,7 +10,7 @@ namespace solidity::yul::ssa
 
 class ReversePhiFunctionTransform;
 
-class StackLayoutGenerator
+class BackwardStackLayoutGenerator
 {
 
 public:
@@ -54,7 +54,7 @@ public:
 private:
 	static void handlePhiFunctions(StackData& _stackData, ReversePhiFunctionTransform const& _phiInverse, SSACFGLiveness::LivenessData const& _liveness);
 
-	explicit StackLayoutGenerator(SSACFGLiveness const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder);
+	explicit BackwardStackLayoutGenerator(SSACFGLiveness const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder);
 
 	SSACFGStackLayout const& computeStackLayout();
 	void defineStackIn(SSACFG::BlockId const& _blockId);
