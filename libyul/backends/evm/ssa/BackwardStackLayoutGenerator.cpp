@@ -20,9 +20,9 @@ using namespace solidity::yul;
 using namespace solidity::yul::ssa;
 
 #if !defined(NDEBUG)
-bool StackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = true;
+bool BackwardStackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = true;
 #else
-bool StackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = false;
+bool BackwardStackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = false;
 #endif
 
 namespace
@@ -53,7 +53,7 @@ private:
 	SSACFG const& m_cfg;
 };*/
 
-void declareJunk(StackLayoutGenerator::StackType& _stack, SSACFGLiveness::LivenessData const& _live)
+void declareJunk(BackwardStackLayoutGenerator::StackType& _stack, SSACFGLiveness::LivenessData const& _live)
 {
 	for (size_t depth = 0; depth < _stack.size(); ++depth)
 		if (auto const* valueId = std::get_if<SSACFG::ValueId>(&_stack.slot(depth)))
