@@ -48,7 +48,6 @@ public:
 	using StackType = Stack<Slot, StackManipulationCallbacks>;
 	using StackData = StackType::Data;
 
-	// static ControlFlowLayout generate(ControlFlowLiveness const& _controlFlowLiveness);
 	static SSACFGStackLayout generate(SSACFGLiveness const& _cfgLiveness, SSACFGJunkBlockFinder const& _junkBlockFinder);
 
 private:

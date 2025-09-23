@@ -64,3 +64,15 @@ void declareJunk(BackwardStackLayoutGenerator::StackType& _stack, SSACFGLiveness
 }
 
 
+SSACFGStackLayout BackwardStackLayoutGenerator::generate(SSACFGLiveness const& _cfgLiveness, SSACFGJunkBlockFinder const& _junkBlockFinder)
+{
+
+}
+BackwardStackLayoutGenerator::BackwardStackLayoutGenerator(SSACFGLiveness const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder):
+	m_liveness(_liveness),
+	m_cfg(_liveness.cfg()),
+	m_junkBlockFinder(_junkBlockFinder),
+	m_blockIsGenerated(m_cfg.numBlocks(), false),
+	m_blockHasStackInDefined(m_cfg.numBlocks(), false)
+{
+}
