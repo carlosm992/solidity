@@ -55,6 +55,8 @@ private:
 
 	explicit BackwardStackLayoutGenerator(SSACFGLiveness const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder);
 
+	void visitBlocks();
+
 	SSACFGStackLayout const& computeStackLayout();
 	void defineStackIn(SSACFG::BlockId const& _blockId);
 	void visitBlock(SSACFG::BlockId const& _blockId);

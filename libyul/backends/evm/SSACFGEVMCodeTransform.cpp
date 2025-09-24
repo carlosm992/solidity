@@ -285,6 +285,8 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 		{
 			{
 				auto stackIn = m_stackLayout[_conditionalJump.nonZero].stackIn;
+				// todo only emplace back if it's not already on top of the stack and it's not live-out
+				//if (stackIn.empty() || stackIn.back() != Slot{_conditionalJump.condition} || !m_liveness.liveOut(_block).contains(_conditionalJump.condition))
 				stackIn.emplace_back(_conditionalJump.condition);
 				if constexpr (debugOutput)
 					std::cout << "\t\tJUMPI Creating stack for nonZero layout (to Block " << _conditionalJump.nonZero.value << ") " << stackToString(m_stack.data(), m_cfg) << " -> " << stackToString(stackIn, m_cfg) << std::endl;
