@@ -63,7 +63,6 @@ private:
 	SSACFGLiveness const& m_liveness;
 	SSACFG const& m_cfg;
 
-	std::vector<bool> m_blockIsGenerated;
 	std::vector<bool> m_blockHasStackInDefined;
 	SSACFGJunkBlockFinder const& m_junkBlockFinder;
 

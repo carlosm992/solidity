@@ -152,7 +152,6 @@ void junkShuffler(StackLayoutGenerator::StackType& _stack)
 StackLayoutGenerator::StackLayoutGenerator(SSACFGLiveness const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder):
 	m_liveness(_liveness),
 	m_cfg(_liveness.cfg()),
-	m_blockIsGenerated(m_cfg.numBlocks(), false),
 	m_blockHasStackInDefined(m_cfg.numBlocks(), false),
 	m_junkBlockFinder(_junkBlockFinder)
 {
@@ -218,6 +217,8 @@ SSACFGStackLayout const& StackLayoutGenerator::computeStackLayout()
 	// traverse the cfg layer-wise using Kahn's algorithm
 	// like this, (most of) the entry exit layouts are known when a block is processed
 
+	// todo revisit the loop heads (back edge targets) after the first iteration
+
 	std::vector<std::size_t> inDegreesIgnoringBackedges(m_cfg.numBlocks(), 0);
 
 	for (SSACFG::BlockId id{0}; id.value < m_cfg.numBlocks(); ++id.value)
@@ -244,7 +245,6 @@ SSACFGStackLayout const& StackLayoutGenerator::computeStackLayout()
 	}
 	yulAssert(numVisited == m_liveness.topologicalSort().preOrder().size());
 
-	// todo unnecessary copy here
 	return m_stackLayout;
 }
 
@@ -271,7 +271,7 @@ void StackLayoutGenerator::defineStackIn(SSACFG::BlockId const& _blockId)
 
 	std::vector<std::pair<SSACFG::BlockId, StackData const*>> parentExits;
 	for (auto const& entry: block.entries)
-		if (m_blockIsGenerated[entry.value])
+		if (m_blockHasStackInDefined[entry.value])
 			parentExits.emplace_back(entry, &m_stackLayout[entry].stackOut);
 
 	yulAssert(!parentExits.empty(), fmt::format("None of the parents of block {} were generated", _blockId));
@@ -386,7 +386,6 @@ void StackLayoutGenerator::defineStackIn(SSACFG::BlockId const& _blockId)
 
 void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 {
-	yulAssert(!m_blockIsGenerated[_blockId.value]);
 	defineStackIn(_blockId);
 	yulAssert(m_blockHasStackInDefined[_blockId.value]);
 
@@ -591,7 +590,6 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 	}
 
 	m_stackLayout[_blockId].stackOut = currentStackData;
-	m_blockIsGenerated[_blockId.value] = true;
 
 	if constexpr (debugOutput)
 		std::cout << fmt::format("\t\tstack out = {}\n", stackToString(currentStackData, m_cfg));
