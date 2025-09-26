@@ -45,7 +45,7 @@ SSACFGJunkBlockFinder::SSACFGJunkBlockFinder(SSACFG const& _cfg, ForwardSSACFGTo
 	for (auto const blockIndex: _topologicalSort.preOrder())
 	{
 		SSACFG::BlockId const blockId {blockIndex};
-		m_blockAllowsJunk[blockIndex] = bridgeFinder.bridgeVertex(blockId);
+		m_blockAllowsJunk[blockIndex] = bridgeFinder.bridgeVertex(blockId) || _cfg.block(blockId).isTerminationBlock();
 		if (_cfg.block(blockId).isFunctionReturnBlock())
 			functionReturns.emplace_back(SSACFG::BlockId{blockIndex});
 	}

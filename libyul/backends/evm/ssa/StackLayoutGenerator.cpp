@@ -444,46 +444,8 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		// declareJunk(stack, opLiveOutWithoutOutputs );
 		if constexpr(debugOutput)
 			std::cout << "{ " << stackToString(std::vector(liveOutWithoutOutputs.begin(), liveOutWithoutOutputs.end()), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ") -> " << std::flush;
-		OperationForwardShuffler<StackType>::shuffle(stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
-		/*static auto constexpr compat = [](Slot const& _source, Slot const& _target)
-		{
-			return std::holds_alternative<ssa::JunkSlot>(_target) || _source == _target;
-		};
-		auto const fun = [&](Slot const& _slot) -> bool
-		{
-			if (auto const* valueId = std::get_if<SSACFG::ValueId>(&_slot))
-				return !liveOutWithoutOutputsSet.contains(*valueId);
-			return false;
-		};
-		auto tail = stack.data();
-		if (!m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId))
-		{
-			std::erase_if(tail, fun);
-			BlockForwardAStarShuffler<StackType, slotIsCompatible>::shuffle(stack, tail, requiredStackTop);
-		}
-		else
-		{
-			for (auto& slot: tail)
-				if (fun(slot))
-					slot = ssa::JunkSlot{};
-			for (auto const& slot: requiredStackTop)
-				yulAssert(!std::holds_alternative<ssa::JunkSlot>(slot));
-			BlockForwardAStarShuffler<StackType, slotIsCompatible>::shuffle(stack, tail, requiredStackTop);
-		}*/
-		/*if (!m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId))
-		{
-			if constexpr(debugOutput)
-				std::cout << "{ " << stackToString(std::vector(liveOutWithoutOutputs.begin(), liveOutWithoutOutputs.end()), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ")";
-			DanielShuffler<StackType>::shuffle(stack, liveOutWithoutOutputsSet, requiredStackTop);
-		}
-		else
-		{
-			if constexpr(debugOutput)
-				std::cout << "{ " << stackToString(pileOfJunk<Slot>(junkTailSize(stack.data())), m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ")";
-			auto const v = stack.data() | ranges::views::transform([&](auto const& _slot) -> Slot { return liveOutWithoutOutputsSet.contains(_slot) ? _slot : JunkSlot{}; }) | ranges::to<std::vector<Slot>>;
-			DanielShuffler<StackType>::shuffle(stack, {}, v + requiredStackTop);
-		}*/
 
+		OperationForwardShuffler<StackType>::shuffle(stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
 
 		m_stackLayout[_blockId].operationIn.push_back(currentStackData);
 
