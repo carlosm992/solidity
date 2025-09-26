@@ -400,10 +400,9 @@ private:
 				// if the top is required in the second slot position and we require something at the top that isn’t
 				// already sufficiently often in the args section and (we can introduce junk or the target top is also
 				// required for the tail), try duping a deeper element
-
 				if (ops.isArgsCompatible(0, 1) && !ops.needsMoreSlots())
 				{
-					if ((false || ops.requiredInTail(_args.back())) && ops.stackStats.argsCount(_args.back()) < ops.targetArgsCount(_args.back())) //
+					if (ops.requiredInTail(_args.back()) && ops.stackStats.argsCount(_args.back()) < ops.targetArgsCount(_args.back())) //
 					{
 						// dup up whatever wants to be at the top
 						for (size_t depth = 1; depth < ReachableStackDepth && depth < _stack.size(); ++depth)
@@ -426,6 +425,10 @@ private:
 					}
 				}
 			}
+
+			// if we can introduce junk, just try to dup it up
+			if (_generateJunk && dupDeepSlotIfRequired(ops, _stack, _generateJunk))
+				_stack.pushOrDup(_args.back());
 
 			// if we need more of whatever goes to the top and it's reachable, just dup it
 			if (ops.targetMinCount(_args.back()) > ops.stackStats.totalCount(_args.back()))
