@@ -514,15 +514,53 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		//auto const nonZeroUsed = m_liveness.used(cjump->nonZero);
 		//auto const zeroUsed = m_liveness.used(cjump->zero);
 
-		SSACFGLiveness::LivenessData commonLiveOut;
+		SSACFGLiveness::LivenessData liveOutUnion;
 		for (auto const& [liveIn, target]: { std::pair{&zeroLiveIn, cjump->zero}, std::pair{&nonZeroLiveIn, cjump->nonZero} }) {
 			ReversePhiFunctionTransform transf(m_cfg, _blockId, target);
 			for (auto const& [valueId, count]: *liveIn)
-				commonLiveOut.insert(transf(valueId), count);
+				liveOutUnion.insert(transf(valueId), count);
+		}
+
+		if (!liveOutUnion.contains(cjump->condition) && !stack.empty() && stack.top() == Slot{cjump->condition})
+		{
+			// we done, condition is already on top of stack and no longer needed
+		}
+		else
+		{
+			// todo might need to compress stack if unreachable
+			if (liveOutUnion.contains(cjump->condition))
+			{
+				// need to dup
+				stack.pushOrDup(Slot{cjump->condition});
+			}
+			else
+			{
+				// can swap up
+				if (auto const depth = stack.slotDepth(cjump->condition))
+					stack.swap(*depth);
+				else
+					stack.push(Slot{cjump->condition});
+			}
 		}
 
 		// mark all as junk that are not live
-		declareJunk(stack, commonLiveOut);
+		liveOutUnion.insert(cjump->condition);
+
+		yulAssert(!stack.empty() && stack.top() == Slot{cjump->condition});
+		yulAssert(m_cfg.block(cjump->nonZero).phis.empty());
+
+		m_stackLayout[cjump->nonZero].stackIn = currentStackData;
+		m_stackLayout[cjump->nonZero].stackIn.pop_back(); // god-mode remove condition, we consume that with jumpi
+
+		m_blockHasStackInDefined[cjump->nonZero.value] = true;
+		// same as nonzero stack in initially
+		m_stackLayout[cjump->zero].stackIn = m_stackLayout[cjump->nonZero].stackIn;
+		handlePhiFunctions(m_stackLayout[cjump->zero].stackIn, ReversePhiFunctionTransform(m_cfg, _blockId, cjump->zero), zeroLiveIn);
+		{
+			StackType zeroStack(m_stackLayout[cjump->zero].stackIn, {}, {&m_cfg});
+			declareJunk(zeroStack, zeroLiveIn);
+		}
+		m_blockHasStackInDefined[cjump->zero.value] = true;
 
 		if (false)
 		{
