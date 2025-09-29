@@ -1,0 +1,96 @@
+/*
+	This file is part of solidity.
+
+	solidity is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	solidity is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with solidity.  If not, see <http://www.gnu.org/licenses/>.
+*/
+// SPDX-License-Identifier: GPL-3.0
+
+#include <libyul/backends/evm/EVMDialect.h>
+#include <libyul/backends/evm/SSAControlFlowGraphBuilder.h>
+#include <libyul/YulStack.h>
+
+#include <liblangutil/ErrorReporter.h>
+
+#include <benchmark/benchmark.h>
+
+#include <filesystem>
+#include <fstream>
+
+std::shared_ptr<solidity::yul::Object> parse(std::string_view _filePath)
+{
+	auto const fileContents = [&]
+	{
+		std::filesystem::path const file(_filePath);
+		if (!std::filesystem::exists(file) || !std::filesystem::is_regular_file(file))
+			throw std::runtime_error("File does not exist.");
+		std::string result;
+		if (std::ifstream is{file, std::ios::binary | std::ios::ate})
+		{
+			auto size = is.tellg();
+			result = std::string(size, '\0');
+			is.seekg(0);
+			if (!is.read(&result[0], size))
+				throw std::runtime_error("Failed to read file.");
+		}
+		else
+			throw std::runtime_error("Failed to open file.");
+		return result;
+	}();
+	solidity::yul::YulStack stack (
+		solidity::langutil::EVMVersion::current(),
+		std::nullopt,
+		solidity::yul::Language::StrictAssembly,
+		solidity::frontend::OptimiserSettings::standard(),
+		solidity::langutil::DebugInfoSelection::None()
+	);
+	stack.parseAndAnalyze("", fileContents);
+	return stack.parserResult();
+}
+
+std::unique_ptr<solidity::yul::ControlFlow> buildSSACFG(solidity::yul::Object const& _object)
+{
+	std::unique_ptr<solidity::yul::ControlFlow> controlFlow = solidity::yul::SSAControlFlowGraphBuilder::build(
+		*_object.analysisInfo,
+		*_object.dialect(),
+		_object.code()->root(),
+		false
+	);
+	return controlFlow;
+}
+
+solidity::yul::ControlFlowLiveness computeLiveness(solidity::yul::ControlFlow const& _controlFlow)
+{
+	return solidity::yul::ControlFlowLiveness(_controlFlow);
+}
+
+static void BM_BuildSSACFG(benchmark::State& state) {
+	auto const& object = parse("/home/mho/dev/solidity/deposit.yul");
+	for (auto _ : state) {
+		auto cfg = buildSSACFG(*object);
+		benchmark::DoNotOptimize(cfg);
+	}
+}
+
+static void BM_SSACFGLiveness(benchmark::State& state) {
+	auto const& object = parse("/home/mho/dev/solidity/deposit.yul");
+	auto const cfg = buildSSACFG(*object);
+	for (auto _ : state) {
+		auto cfgLiveness = computeLiveness(*cfg);
+		benchmark::DoNotOptimize(cfgLiveness);
+	}
+}
+
+BENCHMARK(BM_BuildSSACFG);
+BENCHMARK(BM_SSACFGLiveness);
+BENCHMARK_MAIN();
