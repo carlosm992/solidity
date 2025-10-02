@@ -1,7 +1,7 @@
 #pragma once
 #include "libyul/backends/evm/SSACFGStackLayout.h"
 #include "libyul/backends/evm/SSACFGStackShuffler.h"
-#include "libyul/backends/evm/SSAControlFlowGraph.h"
+#include "libyul/backends/evm/ssa/SSACFG.h"
 
 
 #include <optional>
@@ -42,7 +42,7 @@ private:
 };
 
 template<typename Stack>
-void shuffleStack(Stack& _stack, typename Stack::Data const& _target, SSACFG const& _cfg, std::optional<SSACFG::Edge> _edge = std::nullopt)
+void shuffleStackExact(Stack& _stack, typename Stack::Data const& _target, SSACFG const& _cfg, std::optional<SSACFG::Edge> _edge = std::nullopt)
 {
 	auto const transform = _edge ? ReversePhiFunctionTransform(_cfg, _edge->from, _edge->to) : ReversePhiFunctionTransform{};
 	auto const transformedTarget = [&]

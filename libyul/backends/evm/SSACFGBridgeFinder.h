@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include <libyul/backends/evm/SSAControlFlowGraph.h>
+#include <libyul/backends/evm/ssa/SSACFG.h>
 
 #include <range/v3/view/concat.hpp>
 
@@ -33,7 +33,7 @@ namespace solidity::yul
 class SSACFGBridgeFinder
 {
 public:
-	explicit SSACFGBridgeFinder(SSACFG const& _cfg):
+	explicit SSACFGBridgeFinder(ssa::SSACFG const& _cfg):
 		m_cfg(_cfg),
 		m_bridgeVertex(_cfg.numBlocks()),
 		m_visited(_cfg.numBlocks()),
@@ -44,13 +44,13 @@ public:
 		dfs(time, _cfg.entry, std::nullopt);
 	}
 
-	bool bridgeVertex(SSACFG::BlockId const& _blockId) const
+	bool bridgeVertex(ssa::SSACFG::BlockId const& _blockId) const
 	{
 		return m_bridgeVertex[_blockId.value];
 	}
 
 private:
-	void dfs(size_t& _time, SSACFG::BlockId const& _vertex, std::optional<SSACFG::BlockId> const& _parent)
+	void dfs(size_t& _time, ssa::SSACFG::BlockId const& _vertex, std::optional<ssa::SSACFG::BlockId> const& _parent)
 	{
 		m_visited[_vertex.value] = true;
 		m_disc[_vertex.value] = _time;
@@ -58,13 +58,13 @@ private:
 		++_time;
 
 		auto const& currentBlock = m_cfg.block(_vertex);
-		std::vector<SSACFG::BlockId> adjacentExitVertices;
-		currentBlock.forEachExit([&](SSACFG::BlockId const& _exit)
+		std::vector<ssa::SSACFG::BlockId> adjacentExitVertices;
+		currentBlock.forEachExit([&](ssa::SSACFG::BlockId const& _exit)
 		{
 			adjacentExitVertices.emplace_back(_exit);
 		});
 
-		for (SSACFG::BlockId const neighbor: ranges::views::concat(adjacentExitVertices, currentBlock.entries))
+		for (ssa::SSACFG::BlockId const neighbor: ranges::views::concat(adjacentExitVertices, currentBlock.entries))
 		{
 			if (neighbor == _parent)
 				continue;
@@ -99,7 +99,7 @@ private:
 		}
 	}
 
-	SSACFG const& m_cfg;
+	ssa::SSACFG const& m_cfg;
 	std::vector<std::uint8_t> m_bridgeVertex;
 	std::vector<std::uint8_t> m_visited;
 	std::vector<std::size_t> m_disc;

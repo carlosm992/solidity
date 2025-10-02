@@ -17,7 +17,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #include <libyul/backends/evm/EVMDialect.h>
-#include <libyul/backends/evm/SSAControlFlowGraphBuilder.h>
+#include <libyul/backends/evm/ssa/SSACFG.h>
 #include <libyul/YulStack.h>
 
 #include <liblangutil/ErrorReporter.h>
@@ -26,6 +26,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <libyul/backends/evm/ssa/ControlFlow.h>
+#include <libyul/backends/evm/ssa/SSACFGBuilder.h>
 
 std::shared_ptr<solidity::yul::Object> parse(std::string_view _filePath)
 {
@@ -58,9 +60,9 @@ std::shared_ptr<solidity::yul::Object> parse(std::string_view _filePath)
 	return stack.parserResult();
 }
 
-std::unique_ptr<solidity::yul::ControlFlow> buildSSACFG(solidity::yul::Object const& _object)
+std::unique_ptr<solidity::yul::ssa::ControlFlow> buildSSACFG(solidity::yul::Object const& _object)
 {
-	std::unique_ptr<solidity::yul::ControlFlow> controlFlow = solidity::yul::SSAControlFlowGraphBuilder::build(
+	std::unique_ptr<solidity::yul::ssa::ControlFlow> controlFlow = solidity::yul::ssa::SSACFGBuilder::build(
 		*_object.analysisInfo,
 		*_object.dialect(),
 		_object.code()->root(),
@@ -69,9 +71,9 @@ std::unique_ptr<solidity::yul::ControlFlow> buildSSACFG(solidity::yul::Object co
 	return controlFlow;
 }
 
-solidity::yul::ControlFlowLiveness computeLiveness(solidity::yul::ControlFlow const& _controlFlow)
+solidity::yul::ssa::ControlFlowLiveness computeLiveness(solidity::yul::ssa::ControlFlow const& _controlFlow)
 {
-	return solidity::yul::ControlFlowLiveness(_controlFlow);
+	return solidity::yul::ssa::ControlFlowLiveness(_controlFlow);
 }
 
 static void BM_BuildSSACFG(benchmark::State& state) {

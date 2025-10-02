@@ -684,17 +684,6 @@ void SSACFGBuilder::writeVariable(
 {
 	currentDef(_variable, _block) = _value;
 }
-void SSAControlFlowGraphBuilder::eraseEmptyJumpBlocks(SSACFG& _cfg)
-{
-	for (SSACFG::BlockId blockId {0}; blockId.value < _cfg.numBlocks(); ++blockId.value)
-	{
-		auto const& block = _cfg.block(blockId);
-		if (block.operations.empty() && block.isJumpBlock())
-		{
-
-		}
-	}
-}
 
 Scope::Function const& SSACFGBuilder::lookupFunction(YulName _name) const
 {

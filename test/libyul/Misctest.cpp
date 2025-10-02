@@ -4,7 +4,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include <libyul/backends/evm/SSACFGLiveness.h>
+#include <libyul/backends/evm/ssa/LivenessAnalysis.h>
 #include <libyul/backends/evm/SSACFGStack.h>
 #include <libyul/backends/evm/SSACFGStackShuffler.h>
 
@@ -83,10 +83,10 @@ BOOST_AUTO_TEST_SUITE(MiscTest)
 
 BOOST_AUTO_TEST_CASE(yo)
 {
-	auto cfg = std::make_unique<SSACFG>();
+	auto cfg = std::make_unique<ssa::SSACFG>();
 	cfg->debugData = langutil::DebugData::create();
 	cfg->entry = cfg->makeBlock(langutil::DebugData::create());
-	cfg->block(cfg->entry).exit = SSACFG::BasicBlock::MainExit{};
+	cfg->block(cfg->entry).exit = ssa::SSACFG::BasicBlock::MainExit{};
 
 	auto const v1 = cfg->newVariable({0});
 	auto const v2 = cfg->newVariable({0});
@@ -135,7 +135,7 @@ BOOST_AUTO_TEST_CASE(yo)
 		// ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{}, ssa::JunkSlot{},
 		v113, v115, v119, v136, /*ssa::JunkSlot{}, ssa::JunkSlot{},*/ v139, v141
 	};
-	SSACFGLiveness::LivenessData liveness({{v113, 1}, {v115, 1}, {v119, 1}});
+	ssa::LivenessAnalysis::LivenessData liveness({{v113, 1}, {v115, 1}, {v119, 1}});
 	TestStack::Data args{thirtytwo, zero, v139, v136, two, v141};
 	std::vector<SourceSlot> final;
 

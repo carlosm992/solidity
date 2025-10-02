@@ -1,6 +1,6 @@
 #include "AStarShuffler.h"
 #include "ExactShuffler.h"
-#include "libyul/backends/evm/SSACFGLiveness.h"
+#include "libyul/backends/evm/ssa/LivenessAnalysis.h"
 #include "libyul/backends/evm/SSACFGStackShuffler.h"
 #include "range/v3/algorithm/count.hpp"
 #include "range/v3/algorithm/equal.hpp"
@@ -53,7 +53,7 @@ private:
 	SSACFG const& m_cfg;
 };*/
 
-void declareJunk(StackLayoutGenerator::StackType& _stack, SSACFGLiveness::LivenessData const& _live)
+void declareJunk(StackLayoutGenerator::StackType& _stack, LivenessAnalysis::LivenessData const& _live)
 {
 	for (size_t depth = 0; depth < _stack.size(); ++depth)
 		if (auto const* valueId = std::get_if<SSACFG::ValueId>(&_stack.slot(depth)))
@@ -149,7 +149,7 @@ void junkShuffler(StackLayoutGenerator::StackType& _stack)
 
 }
 
-StackLayoutGenerator::StackLayoutGenerator(SSACFGLiveness const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder):
+StackLayoutGenerator::StackLayoutGenerator(LivenessAnalysis const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder):
 	m_liveness(_liveness),
 	m_cfg(_liveness.cfg()),
 	m_blockHasStackInDefined(m_cfg.numBlocks(), false),
@@ -170,14 +170,14 @@ StackLayoutGenerator::StackLayoutGenerator(SSACFGLiveness const& _liveness, SSAC
 // 	return layout;
 // }
 
-SSACFGStackLayout StackLayoutGenerator::generate(SSACFGLiveness const& _cfgLiveness, SSACFGJunkBlockFinder const& _junkBlockFinder)
+SSACFGStackLayout StackLayoutGenerator::generate(LivenessAnalysis const& _cfgLiveness, SSACFGJunkBlockFinder const& _junkBlockFinder)
 {
 	if constexpr (debugOutput)
 		std::cout << "stack layout for "
 				  << (_cfgLiveness.cfg().function ? _cfgLiveness.cfg().function->name.str() : "main graph") << '\n';
 	return StackLayoutGenerator{_cfgLiveness, _junkBlockFinder}.computeStackLayout();
 }
-void StackLayoutGenerator::handlePhiFunctions(StackData& _stackData, ReversePhiFunctionTransform const& _phiInverse, SSACFGLiveness::LivenessData const& _liveness)
+void StackLayoutGenerator::handlePhiFunctions(StackData& _stackData, ReversePhiFunctionTransform const& _phiInverse, LivenessAnalysis::LivenessData const& _liveness)
 {
 	// add any phi function values here that are not already contained in the stack
 	for (auto const& [phi, preImage]: _phiInverse.data())
@@ -364,7 +364,7 @@ void StackLayoutGenerator::defineStackIn(SSACFG::BlockId const& _blockId)
 					{
 						auto otherStackIn = *parentExits[j].second;
 						StackType stack(otherStackIn, {}, {&m_cfg});
-						shuffleStack(stack, referenceStackIn, m_cfg, SSACFG::Edge{parentExits[j].first, _blockId});
+						shuffleStackExact(stack, referenceStackIn, m_cfg, SSACFG::Edge{parentExits[j].first, _blockId});
 						cumulativeCost += stack.callbacks().numOps;
 					}
 				}
@@ -403,7 +403,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 	for (size_t operationIndex = 0; operationIndex < block.operations.size(); ++operationIndex)
 	{
 		SSACFG::Operation const& operation = block.operations[operationIndex];
-		SSACFGLiveness::LivenessData opLiveOut = operationsLiveOut[operationIndex];
+		LivenessAnalysis::LivenessData opLiveOut = operationsLiveOut[operationIndex];
 		auto opLiveOutWithoutOutputs = opLiveOut;
 		for (auto const& output: operation.outputs)
 			opLiveOutWithoutOutputs.erase(output);
@@ -476,7 +476,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		//auto const nonZeroUsed = m_liveness.used(cjump->nonZero);
 		//auto const zeroUsed = m_liveness.used(cjump->zero);
 
-		SSACFGLiveness::LivenessData liveOutUnion;
+		LivenessAnalysis::LivenessData liveOutUnion;
 		for (auto const& [liveIn, target]: { std::pair{&zeroLiveIn, cjump->zero}, std::pair{&nonZeroLiveIn, cjump->nonZero} }) {
 			ReversePhiFunctionTransform transf(m_cfg, _blockId, target);
 			for (auto const& [valueId, count]: *liveIn)
@@ -531,7 +531,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 			std::vector sourceStackWithoutJunkTail(sourceStack.begin() + static_cast<std::ptrdiff_t>(sourceJunkTailSize), sourceStack.end());
 
 			const auto preImage = [&](
-				SSACFGLiveness::LivenessData const& _valueIds,
+				LivenessAnalysis::LivenessData const& _valueIds,
 				SSACFG::BlockId const& _from,
 				SSACFG::BlockId const& _to
 			)

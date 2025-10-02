@@ -24,7 +24,7 @@
 #include <libyul/backends/evm/EVMCodeTransform.h>
 #include <libyul/backends/evm/EVMDialect.h>
 #include <libyul/backends/evm/SSACFGEVMCodeTransform.h>
-#include <libyul/backends/evm/SSAControlFlowGraphBuilder.h>
+#include <libyul/backends/evm/ssa/SSACFGBuilder.h>
 #include <libyul/backends/evm/OptimizedEVMCodeTransform.h>
 
 #include <libyul/optimiser/FunctionCallFinder.h>
@@ -97,13 +97,13 @@ void EVMObjectCompiler::run(Object const& _object, bool _optimize, bool const _s
 			);
 		else
 		{
-			std::unique_ptr<ControlFlow> const controlFlow = SSAControlFlowGraphBuilder::build(
+			std::unique_ptr<ssa::ControlFlow> const controlFlow = ssa::SSACFGBuilder::build(
 				*_object.analysisInfo,
 				*_object.dialect(),
 				_object.code()->root(),
 				false
 			);
-			ControlFlowLiveness const liveness(*controlFlow);
+			ssa::ControlFlowLiveness const liveness(*controlFlow);
 			stackErrors = ssa::SSACFGEVMCodeTransform::run(
 				m_assembly,
 				liveness,

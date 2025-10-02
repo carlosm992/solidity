@@ -29,7 +29,7 @@ using namespace solidity::frontend::test;
 
 namespace solidity::yul::test
 {
-using TestSlot = std::variant<SSACFG::ValueId, ssa::JunkSlot>;
+using TestSlot = std::variant<ssa::SSACFG::ValueId, ssa::JunkSlot>;
 struct PrintCallback
 {
 	using Slot = TestSlot;
@@ -58,12 +58,12 @@ struct SlotCanBeFreelyGenerated
 	using Slot = TestSlot;
 	bool operator()(Slot const& _slot) const
 	{
-		if (std::holds_alternative<SSACFG::ValueId>(_slot))
-			return m_cfg->isLiteralValue(std::get<SSACFG::ValueId>(_slot));
+		if (std::holds_alternative<ssa::SSACFG::ValueId>(_slot))
+			return m_cfg->isLiteralValue(std::get<ssa::SSACFG::ValueId>(_slot));
 		return std::holds_alternative<ssa::JunkSlot>(_slot);
 	}
 
-	SSACFG const* m_cfg;
+	ssa::SSACFG const* m_cfg;
 };
 class SSAStackShufflingTest final: public TestCase
 {
@@ -81,7 +81,7 @@ private:
 	Stack::Data parse(std::string const& _source);
 
 	size_t m_maximumStackDepth{};
-	std::unique_ptr<SSACFG> m_cfg;
+	std::unique_ptr<ssa::SSACFG> m_cfg;
 	Stack::Data m_sourceData;
 	Stack m_sourceStack;
 	Stack::Data m_targetData;

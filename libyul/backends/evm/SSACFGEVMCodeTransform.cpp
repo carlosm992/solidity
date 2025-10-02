@@ -25,8 +25,7 @@
 
 #include <libyul/backends/evm/ssa/StackLayoutGenerator.h>
 
-#include <libyul/backends/evm/ControlFlowGraph.h>
-#include <libyul/backends/evm/SSAControlFlowGraphBuilder.h>
+#include <libyul/backends/evm/ssa/SSACFGBuilder.h>
 #include <libyul/backends/evm/SSACFGStackShuffler.h>
 
 #include <libsolutil/StringUtils.h>
@@ -137,7 +136,7 @@ SSACFGEVMCodeTransform::SSACFGEVMCodeTransform
 	BuiltinContext& _builtinContext,
 	FunctionLabels _functionLabels,
 	SSACFG const& _cfg,
-	SSACFGLiveness const& _liveness
+	LivenessAnalysis const& _liveness
 ):
 	m_assembly(_assembly),
 	m_builtinContext(_builtinContext),
@@ -216,7 +215,7 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			if (auto const* call = std::get_if<SSACFG::Call>(&operation.kind))
 				if (call->canContinue)
 					requiredStackTop.emplace_back(FunctionReturnLabel{&call->call.get()});
-			SSACFGLiveness::LivenessData opLiveOut = m_liveness.operationsLiveOut(_block)[operationIndex];
+			LivenessAnalysis::LivenessData opLiveOut = m_liveness.operationsLiveOut(_block)[operationIndex];
 			auto opLiveOutWithoutOutputs = opLiveOut;
 			for (auto const& output: operation.outputs)
 				opLiveOutWithoutOutputs.erase(output);
@@ -238,7 +237,7 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 		{
 			auto const returnLabelSlot = *(ranges::rbegin(m_stack.data()) + static_cast<std::ptrdiff_t>(operation.inputs.size()));
 			yulAssert(std::holds_alternative<SSACFG::Call>(operation.kind));
-			yulAssert(returnLabelSlot == Slot{ssa::FunctionReturnLabel{&std::get<SSACFG::Call>(operation.kind).call.get()}});
+			yulAssert(returnLabelSlot == Slot{FunctionReturnLabel{&std::get<SSACFG::Call>(operation.kind).call.get()}});
 		}
 
 		yulAssert(
@@ -310,7 +309,7 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			StackData const nonZeroStackData = m_stackData;
 
 			if constexpr (debugOutput)
-				std::cout << "\t\tJUMPI Creating stack for zero layout (to Block " << _conditionalJump.zero.value << ") " << stackToString(m_stack.data(), m_cfg) << " -> " << ssa::stackToString(m_stackLayout[_conditionalJump.zero].stackIn, m_cfg) << std::endl;
+				std::cout << "\t\tJUMPI Creating stack for zero layout (to Block " << _conditionalJump.zero.value << ") " << stackToString(m_stack.data(), m_cfg) << " -> " << stackToString(m_stackLayout[_conditionalJump.zero].stackIn, m_cfg) << std::endl;
 
 			shuffleStack(
 				m_stackLayout[_conditionalJump.zero].stackIn,
@@ -411,26 +410,26 @@ void SSACFGEVMCodeTransform::assertLayoutCompatibility(StackData const& _current
 {
 	yulAssert(
 		_current.size() == _desired.size(),
-		fmt::format("size mismatch: {} = len({}) =/= len({}) = {}", _current.size(), ssa::stackToString(_current, m_cfg), ssa::stackToString(_desired, m_cfg), _desired.size())
+		fmt::format("size mismatch: {} = len({}) =/= len({}) = {}", _current.size(), stackToString(_current, m_cfg), stackToString(_desired, m_cfg), _desired.size())
 	);
 	for (auto&& [index, currentSlot, desiredSlot]: ranges::zip_view(ranges::views::iota(0), _current, _desired))
 		yulAssert(
-			std::holds_alternative<ssa::JunkSlot>(desiredSlot) || currentSlot == desiredSlot,
+			std::holds_alternative<JunkSlot>(desiredSlot) || currentSlot == desiredSlot,
 			fmt::format(
 				"stack element mismatch: {} = {}[{}] =/= {}[{}] = {}",
-				ssa::slotToString(currentSlot, m_cfg),
-				ssa::stackToString(_current, m_cfg),
+				slotToString(currentSlot, m_cfg),
+				stackToString(_current, m_cfg),
 				index,
-				ssa::stackToString(_desired, m_cfg),
+				stackToString(_desired, m_cfg),
 				index,
-				ssa::slotToString(desiredSlot, m_cfg)
+				slotToString(desiredSlot, m_cfg)
 			)
 		);
 }
 
 void SSACFGEVMCodeTransform::shuffleStack(std::vector<Slot> const& _target, std::optional<SSACFG::Edge> const& _edge)
 {
-	ssa::shuffleStack(m_stack, _target, m_cfg, _edge);
+	shuffleStackExact(m_stack, _target, m_cfg, _edge);
 	// todo assertLayoutCompatibility(m_stack.data(), transformedTarget);
 	//yulAssert(transformedTarget == m_stack.stackData());
 	m_stackData = _target;

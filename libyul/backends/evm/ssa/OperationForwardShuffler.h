@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libyul/backends/evm/SSACFGLiveness.h>
+#include <libyul/backends/evm/ssa/LivenessAnalysis.h>
 #include <libyul/backends/evm/SSACFGStack.h>
 
 #include <range/v3/algorithm/equal.hpp>
@@ -42,7 +42,7 @@ public:
 	static void shuffle(
 		Stack& _stack,
 		std::vector<Slot> const& _args,
-		SSACFGLiveness::LivenessData const& _liveOut,
+		LivenessAnalysis::LivenessData const& _liveOut,
 		bool _generateJunk
 	)
 	{
@@ -55,7 +55,7 @@ public:
 	}
 
 private:
-	static std::ptrdiff_t loss(Stack::Data const& _stackData, std::vector<Slot> const& _args, SSACFGLiveness::LivenessData const& _liveOut)
+	static std::ptrdiff_t loss(Stack::Data const& _stackData, std::vector<Slot> const& _args, LivenessAnalysis::LivenessData const& _liveOut)
 	{
 		std::ptrdiff_t result = 0;
 
@@ -122,7 +122,7 @@ private:
 
 	struct Ops
 	{
-		Ops(Stack const& _stack, std::vector<Slot> const& _args, SSACFGLiveness::LivenessData const& _liveOut):
+		Ops(Stack const& _stack, std::vector<Slot> const& _args, LivenessAnalysis::LivenessData const& _liveOut):
 			stackStats(_stack, _args.size()),
 			targetMinCounts(detail::histogram(_args)),
 			stack(_stack),
@@ -204,7 +204,7 @@ private:
 		std::map<Slot, size_t> targetMinCounts;
 		Stack const& stack;
 		std::vector<Slot> const& args;
-		SSACFGLiveness::LivenessData const& liveOut;
+		LivenessAnalysis::LivenessData const& liveOut;
 	};
 
 	// If dupping an ideal slot causes a slot that will still be required to become unreachable, then dup
@@ -303,7 +303,7 @@ private:
 	static bool shuffleStep(
 		Stack& _stack,
 		std::vector<Slot> const& _args,
-		SSACFGLiveness::LivenessData const& _liveOut,
+		LivenessAnalysis::LivenessData const& _liveOut,
 		bool const _generateJunk
 	)
 	{

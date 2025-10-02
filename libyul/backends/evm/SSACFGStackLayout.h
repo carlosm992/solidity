@@ -20,7 +20,7 @@
 
 #include <libyul/backends/evm/AbstractAssembly.h>
 #include <libyul/backends/evm/SSACFGStack.h>
-#include <libyul/backends/evm/SSAControlFlowGraph.h>
+#include <libyul/backends/evm/ssa/SSACFG.h>
 
 #include <libyul/Exceptions.h>
 

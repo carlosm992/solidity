@@ -19,8 +19,8 @@
 #pragma once
 
 #include <libyul/backends/evm/EVMDialect.h>
-#include <libyul/backends/evm/ControlFlow.h>
-#include <libyul/backends/evm/SSAControlFlowGraph.h>
+#include <libyul/backends/evm/ssa/ControlFlow.h>
+#include <libyul/backends/evm/ssa/SSACFG.h>
 #include <libyul/backends/evm/SSACFGStackLayout.h>
 #include <libyul/backends/evm/SSACFGJunkBlockFinder.h>
 #include <libyul/AST.h>
@@ -36,14 +36,11 @@ namespace solidity::langutil
 class ErrorReporter;
 }
 
-namespace solidity::yul
+namespace solidity::yul::ssa
 {
 
-struct AsmAnalysisInfo;
-struct StackLayout;
+class LivenessAnalysis;
 
-namespace ssa
-{
 struct AssemblyCallbacks
 {
 	using Slot = StackSlot;
@@ -127,7 +124,7 @@ private:
 		BuiltinContext& _builtinContext,
 		FunctionLabels _functionLabels,
 		SSACFG const& _cfg,
-		SSACFGLiveness const& _liveness
+		LivenessAnalysis const& _liveness
 	);
 
 	void transformFunction(Scope::Function const& _function);
@@ -146,7 +143,7 @@ private:
 	AbstractAssembly& m_assembly;
 	BuiltinContext& m_builtinContext;
 	SSACFG const& m_cfg;
-	SSACFGLiveness const& m_liveness;
+	LivenessAnalysis const& m_liveness;
 	SSACFGJunkBlockFinder m_junkBlockFinder;
 	SSACFGStackLayout const m_stackLayout;
 	std::vector<StackTooDeepError> m_stackErrors;
@@ -160,5 +157,4 @@ private:
 	std::map<FunctionCall const*, AbstractAssembly::LabelID> m_returnLabels;
 };
 
-}
 }

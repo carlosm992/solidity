@@ -73,10 +73,10 @@ SSAStackShufflingTest::SSAStackShufflingTest(std::string const& _filename):
 	TestCase(_filename),
 	m_cfg([]
 	{
-		auto cfg = std::make_unique<SSACFG>();
+		auto cfg = std::make_unique<ssa::SSACFG>();
 		cfg->debugData = DebugData::create();
 		cfg->entry = cfg->makeBlock(DebugData::create());
-		cfg->block(cfg->entry).exit = SSACFG::BasicBlock::MainExit{};
+		cfg->block(cfg->entry).exit = ssa::SSACFG::BasicBlock::MainExit{};
 		return cfg;
 	}()),
 	m_sourceData(parse(m_reader.source())),

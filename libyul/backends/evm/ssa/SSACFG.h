@@ -42,9 +42,6 @@
 namespace solidity::yul::ssa
 {
 struct SSACFGStackLayout;
-}
-namespace solidity::yul
-{
 class LivenessAnalysis;
 
 class SSACFG
@@ -329,12 +326,12 @@ public:
 }
 
 template<>
-struct fmt::formatter<solidity::yul::SSACFG::BlockId>
+struct fmt::formatter<solidity::yul::ssa::SSACFG::BlockId>
 {
 	static auto constexpr parse(format_parse_context& ctx) -> decltype(ctx.begin()) { return ctx.begin(); }
 
 	template<typename FormatContext>
-	auto format(solidity::yul::SSACFG::BlockId const& _blockId, FormatContext& _ctx) const -> decltype(_ctx.out())
+	auto format(solidity::yul::ssa::SSACFG::BlockId const& _blockId, FormatContext& _ctx) const -> decltype(_ctx.out())
 	{
 		if (_blockId.value == std::numeric_limits<size_t>::max())
 			return fmt::format_to(_ctx.out(), "empty");

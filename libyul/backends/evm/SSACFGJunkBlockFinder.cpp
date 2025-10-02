@@ -20,7 +20,7 @@
 
 #include <libyul/backends/evm/SSACFGBridgeFinder.h>
 
-namespace solidity::yul
+namespace solidity::yul::ssa
 {
 
 SSACFGJunkBlockFinder::SSACFGJunkBlockFinder(SSACFG const& _cfg, ForwardSSACFGTopologicalSort const& _topologicalSort):

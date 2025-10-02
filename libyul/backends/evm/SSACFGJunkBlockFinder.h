@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include <libyul/backends/evm/SSACFGTopologicalSort.h>
-#include <libyul/backends/evm/SSAControlFlowGraph.h>
+#include <libyul/backends/evm/ssa/SSACFGTopologicalSort.h>
+#include <libyul/backends/evm/ssa/SSACFG.h>
 
 #include <cstdint>
 #include <vector>
 
-namespace solidity::yul
+namespace solidity::yul::ssa
 {
 
 class SSACFGJunkBlockFinder
