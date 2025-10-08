@@ -18,6 +18,7 @@
 
 #include <libyul/backends/evm/ssa/SSACFG.h>
 
+#include <libyul/backends/evm/ssa/JunkAdmittingBlocksFinder.h>
 #include <libyul/backends/evm/ssa/LivenessAnalysis.h>
 
 #include <libsolutil/StringUtils.h>
@@ -27,8 +28,6 @@
 #pragma GCC diagnostic ignored "-Wtautological-compare"
 #include <fmt/ranges.h>
 #pragma GCC diagnostic pop
-
-#include <libyul/backends/evm/ssa/JunkAdmittingBlocksFinder.h>
 
 #include <range/v3/view/zip.hpp>
 

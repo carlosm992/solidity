@@ -149,7 +149,7 @@ void junkShuffler(StackLayoutGenerator::StackType& _stack)
 
 }
 
-StackLayoutGenerator::StackLayoutGenerator(LivenessAnalysis const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder):
+StackLayoutGenerator::StackLayoutGenerator(LivenessAnalysis const& _liveness, TerminationPathAnalysis const& _junkBlockFinder):
 	m_liveness(_liveness),
 	m_cfg(_liveness.cfg()),
 	m_blockHasStackInDefined(m_cfg.numBlocks(), false),
@@ -170,7 +170,7 @@ StackLayoutGenerator::StackLayoutGenerator(LivenessAnalysis const& _liveness, SS
 // 	return layout;
 // }
 
-SSACFGStackLayout StackLayoutGenerator::generate(LivenessAnalysis const& _cfgLiveness, SSACFGJunkBlockFinder const& _junkBlockFinder)
+SSACFGStackLayout StackLayoutGenerator::generate(LivenessAnalysis const& _cfgLiveness, TerminationPathAnalysis const& _junkBlockFinder)
 {
 	if constexpr (debugOutput)
 		std::cout << "stack layout for "

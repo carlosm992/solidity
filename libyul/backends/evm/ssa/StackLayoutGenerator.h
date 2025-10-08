@@ -1,6 +1,6 @@
 #pragma once
 
-#include <libyul/backends/evm/SSACFGJunkBlockFinder.h>
+#include <libyul/backends/evm/ssa/TerminationPathAnalysis.h>
 #include <libyul/backends/evm/ssa/LivenessAnalysis.h>
 #include <libyul/backends/evm/SSACFGStackLayout.h>
 #include <libyul/backends/evm/ssa/SSACFG.h>
@@ -49,12 +49,12 @@ public:
 	using StackData = StackType::Data;
 
 	// static ControlFlowLayout generate(ControlFlowLiveness const& _controlFlowLiveness);
-	static SSACFGStackLayout generate(LivenessAnalysis const& _cfgLiveness, SSACFGJunkBlockFinder const& _junkBlockFinder);
+	static SSACFGStackLayout generate(LivenessAnalysis const& _cfgLiveness, TerminationPathAnalysis const& _junkBlockFinder);
 
 private:
 	static void handlePhiFunctions(StackData& _stackData, ReversePhiFunctionTransform const& _phiInverse, LivenessAnalysis::LivenessData const& _liveness);
 
-	explicit StackLayoutGenerator(LivenessAnalysis const& _liveness, SSACFGJunkBlockFinder const& _junkBlockFinder);
+	explicit StackLayoutGenerator(LivenessAnalysis const& _liveness, TerminationPathAnalysis const& _junkBlockFinder);
 
 	SSACFGStackLayout const& computeStackLayout();
 	void defineStackIn(SSACFG::BlockId const& _blockId);
@@ -64,7 +64,7 @@ private:
 	SSACFG const& m_cfg;
 
 	std::vector<bool> m_blockHasStackInDefined;
-	SSACFGJunkBlockFinder const& m_junkBlockFinder;
+	TerminationPathAnalysis const& m_junkBlockFinder;
 
 	SSACFGStackLayout m_stackLayout;
 };

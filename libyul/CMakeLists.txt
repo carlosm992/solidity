@@ -68,10 +68,6 @@ add_library(yul
 	backends/evm/NoOutputAssembly.cpp
 	backends/evm/OptimizedEVMCodeTransform.cpp
 	backends/evm/OptimizedEVMCodeTransform.h
-    backends/evm/SSACFGBridgeFinder.h
-
-	backends/evm/SSACFGJunkBlockFinder.cpp
-	backends/evm/SSACFGJunkBlockFinder.h
 	backends/evm/SSACFGStackShuffler.h
 	backends/evm/SSACFGStack.cpp
 	backends/evm/SSACFGStack.h

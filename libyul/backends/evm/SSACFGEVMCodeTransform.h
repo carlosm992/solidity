@@ -22,7 +22,7 @@
 #include <libyul/backends/evm/ssa/ControlFlow.h>
 #include <libyul/backends/evm/ssa/SSACFG.h>
 #include <libyul/backends/evm/SSACFGStackLayout.h>
-#include <libyul/backends/evm/SSACFGJunkBlockFinder.h>
+#include <libyul/backends/evm/ssa/TerminationPathAnalysis.h>
 #include <libyul/AST.h>
 #include <libyul/Exceptions.h>
 #include <libyul/Scope.h>
@@ -144,7 +144,7 @@ private:
 	BuiltinContext& m_builtinContext;
 	SSACFG const& m_cfg;
 	LivenessAnalysis const& m_liveness;
-	SSACFGJunkBlockFinder m_junkBlockFinder;
+	TerminationPathAnalysis m_junkBlockFinder;
 	SSACFGStackLayout const m_stackLayout;
 	std::vector<StackTooDeepError> m_stackErrors;
 	AssemblyCallbacks m_assemblyCallbacks;
