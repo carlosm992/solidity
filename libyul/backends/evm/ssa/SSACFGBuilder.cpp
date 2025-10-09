@@ -82,6 +82,7 @@ std::unique_ptr<ControlFlow> SSACFGBuilder::build(
 	if (!builder.blockInfo(builder.m_currentBlock).sealed)
 		builder.sealBlock(builder.m_currentBlock);
 	mainGraph.block(builder.m_currentBlock).exit = SSACFG::BasicBlock::MainExit{};
+	controlFlow->functionGraphs.at(0)->block(builder.m_currentBlock).exit = SSACFG::BasicBlock::MainExit{};
 	builder.cleanUnreachable();
 	return controlFlow;
 }
