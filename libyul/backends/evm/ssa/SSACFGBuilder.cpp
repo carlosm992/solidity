@@ -24,6 +24,7 @@
 #include <libyul/backends/evm/ssa/ControlFlow.h>
 
 #include <libyul/AST.h>
+#include <libyul/AsmAnalysisInfo.h>
 #include <libyul/ControlFlowSideEffectsCollector.h>
 #include <libyul/Exceptions.h>
 #include <libyul/Utilities.h>

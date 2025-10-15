@@ -25,7 +25,6 @@
 
 
 #include <libyul/AST.h>
-#include <libyul/AsmAnalysisInfo.h>
 #include <libyul/Dialect.h>
 #include <libyul/Exceptions.h>
 #include <libyul/Scope.h>
@@ -284,8 +283,7 @@ public:
 	std::string toDot(
 		bool _includeDiGraphDefinition=true,
 		std::optional<size_t> _functionIndex=std::nullopt,
-		LivenessAnalysis const* _liveness=nullptr,
-		ssa::SSACFGStackLayout const* _stackLayout=nullptr
+		LivenessAnalysis const* _liveness=nullptr
 	) const;
 
 	PhiValue const& phiInfo(ValueId const& _valueId) const
@@ -338,7 +336,7 @@ struct fmt::formatter<solidity::yul::ssa::SSACFG::BlockId>
 	template<typename FormatContext>
 	auto format(solidity::yul::ssa::SSACFG::BlockId const& _blockId, FormatContext& _ctx) const -> decltype(_ctx.out())
 	{
-		if (_blockId.value == std::numeric_limits<size_t>::max())
+		if (!_blockId.hasValue())
 			return fmt::format_to(_ctx.out(), "empty");
 		return fmt::format_to(_ctx.out(), "{}", _blockId.value);
 	}
