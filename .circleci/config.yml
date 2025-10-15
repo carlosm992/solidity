@@ -918,25 +918,6 @@ jobs:
           command: test/docsCodeStyle.sh
       - matrix_notify_failure_unless_pr
 
-  chk_coding_style:
-    <<: *base_cimg_small
-    steps:
-      - checkout
-      - run:
-          name: Install shellcheck
-          command: |
-            sudo apt -q update
-            sudo apt install -y shellcheck
-      - run:
-          name: Check for C++ coding style
-          command: scripts/check_style.sh
-      - run:
-          name: checking shell scripts
-          command: scripts/chk_shellscripts/chk_shellscripts.sh
-      - run:
-          name: Check for broken symlinks
-          command: scripts/check_symlinks.sh
-      - matrix_notify_failure_unless_pr
 
   chk_errorcodes:
     <<: *base_ubuntu2404_small
@@ -1946,7 +1927,6 @@ workflows:
     jobs:
       # basic checks
       - chk_spelling: *requires_nothing
-      - chk_coding_style: *requires_nothing
       # DISABLED FOR 0.6.0 - chk_docs_examples: *requires_nothing
       - chk_buglist: *requires_nothing
       - chk_proofs: *requires_nothing

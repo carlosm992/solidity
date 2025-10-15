@@ -1,0 +1,73 @@
+name: Code Style Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  chk_coding_style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 #v5.0.0
+
+      - name: Install dependencies
+        run: |
+          sudo apt -q update
+          sudo apt install -y shellcheck git
+
+      - name: Check for C++ coding style
+        id: style-check
+        run: |
+          output=$(scripts/check_style.sh 2>&1) || {
+            {
+              echo "output<<EOF"
+              echo "$output"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+            exit 1
+          }
+
+      - name: Comment PR on failure
+        if: ${{ failure() && steps.style-check.outcome == 'failure' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd #v8.0.0
+        with:
+          script: |
+            const output = `${{ steps.style-check.outputs.output }}`;
+            const body = `There was an error when running \`Code Style Check\` for commit \`${context.sha}\`:
+            \`\`\`
+            ${output}
+            \`\`\`
+            Please check that your changes are working as intended.`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+            for (const line of output.split('\n')) {
+              const match = line.match(/^([^:]+\.(cpp|h)):(\d+):/);
+              if (!match) continue;
+              const [, filePath, , lineNumber] = match;
+              await github.rest.pulls.createReviewComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                commit_id: context.sha,
+                path: filePath,
+                line: parseInt(lineNumber),
+                side: 'RIGHT',
+                body: 'Coding style error'
+              });
+            }
+
+      - name: checking shell scripts
+        run: scripts/chk_shellscripts/chk_shellscripts.sh
+
+      - name: Check for broken symlinks
+        run: scripts/check_symlinks.sh
