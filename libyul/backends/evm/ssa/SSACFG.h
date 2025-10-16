@@ -60,6 +60,12 @@ public:
 		bool hasValue() const { return value != std::numeric_limits<ValueType>::max(); }
 		auto operator<=>(BlockId const&) const = default;
 	};
+	struct Edge
+	{
+		BlockId from;
+		BlockId to;
+		auto operator<=>(Edge const&) const = default;
+	};
 	class ValueId
 	{
 	public:
@@ -100,12 +106,7 @@ public:
 		ValueType m_value{std::numeric_limits<ValueType>::max()};
 		Kind m_kind{Kind::Unreachable};
 	};
-	struct Edge
-	{
-		BlockId from;
-		BlockId to;
-		auto operator<=>(Edge const&) const = default;
-	};
+
 	struct BuiltinCall
 	{
 		langutil::DebugData::ConstPtr debugData;
