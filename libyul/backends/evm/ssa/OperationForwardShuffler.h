@@ -1,5 +1,8 @@
 #pragma once
 
+#include "range/v3/view/enumerate.hpp"
+
+
 #include <libyul/backends/evm/ssa/LivenessAnalysis.h>
 #include <libyul/backends/evm/ssa/Stack.h>
 
@@ -52,6 +55,8 @@ private:
 					++histogramTail[slot];
 				else
 					++histogramArgs[slot];
+				if (_stack.size() - i - 1 < ReachableStackDepth)
+					++histogramReachable[slot]++;
 			}
 		}
 
@@ -70,9 +75,15 @@ private:
 			return util::valueOrDefault(histogramTail, _slot, static_cast<size_t>(0));
 		}
 
+		size_t reachableCount(Slot const& _slot) const
+		{
+			return util::valueOrDefault(histogramReachable, _slot, static_cast<size_t>(0));
+		}
+
 	private:
 		boost::container::flat_map<Slot, size_t> histogramTail;
 		boost::container::flat_map<Slot, size_t> histogramArgs;
+		boost::container::flat_map<Slot, size_t> histogramReachable;
 		boost::container::flat_map<Slot, size_t> histogram;
 	};
 
@@ -196,6 +207,10 @@ private:
 			bool const needMore = _ops.targetMinCount(slot) > _ops.stackStats.totalCount(slot);
 			if (neededInArgs || needMore)
 			{
+				// if we ever need more of a slot then this can only happen if it is something we require
+				// in the arguments
+				yulAssert(_ops.requiredInArgs(slot));
+
 				auto const [haveMoreAboveWithoutArgs, haveMoreAbove] = [&]
 				{
 					for (size_t offset = sourceOffset + 1; offset < _stack.size(); ++offset)
@@ -219,23 +234,27 @@ private:
 				if (reachable)
 				{
 					if (
-						!_ops.requiredInArgs(_stack.top()) ||  // current top can go into tail
-						!_ops.isArgsCompatible(0, 0)
+						!_ops.isArgsCompatible(sourceOffset, sourceOffset) &&  // the offset isn't already in the right position wrt args
+						(
+							!_ops.requiredInArgs(_stack.top()) || // current top can go into tail, ie it's not required as arg or
+							_ops.stackStats.reachableCount(_stack.top()) > 1 // there's more of it in reachable stack depth
+						)
 					)
 					{
-						// top needs to go into tail, swap it
+						// top can go into the tail bit, swap it down
 						_stack.swap(sourceDepth);
 					}
 					else
 					{
-						// we need more of slot, dup it
+						// we need more of the slot that is about to go out of reach, dup it
 						_stack.pushOrDup(slot);
 						return true;
 					}
 				}
 				else
 				{
-					// try compressing the stack, first looking at the top
+					// the slot we need something in the args region of is unreachable, try compressing the stack,
+					// first looking at the top
 					if (_ops.canBePopped(_stack.top()) || _stack.top().isJunk())
 					{
 						_stack.pop();
@@ -265,7 +284,7 @@ private:
 							_stack.pop();
 							return true;
 						}
-					// todo stack too deep :(
+					// todo stack too deep of `slot`. :(
 					return false;
 				}
 			}
@@ -366,7 +385,6 @@ private:
 		{
 			if (ops.stackStats.totalCount(arg) < ops.targetMinCount(arg))
 			{
-				// todo dupDeepSlotIfRequired needs checking
 				if (!dupDeepSlotIfRequired(ops, _stack, _generateJunk))
 				{
 					_stack.pushOrDup(arg);
