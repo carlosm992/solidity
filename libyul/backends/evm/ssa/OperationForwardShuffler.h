@@ -6,16 +6,10 @@
 #include <range/v3/algorithm/equal.hpp>
 #include <range/v3/algorithm/find.hpp>
 #include <range/v3/algorithm/none_of.hpp>
-#include <range/v3/view/drop.hpp>
 #include <range/v3/view/iota.hpp>
-#include <range/v3/view/take.hpp>
 #include <range/v3/range_concepts.hpp>
 
 #include <boost/container/flat_map.hpp>
-
-#include <cstdint>
-#include <map>
-#include <variant>
 
 namespace solidity::yul::ssa
 {
@@ -30,15 +24,16 @@ public:
 		Stack<Callback>& _stack,
 		std::vector<Slot> const& _args,
 		LivenessAnalysis::LivenessData const& _liveOut,
+		std::size_t _targetSize,
 		bool _generateJunk
 	)
 	{
 		yulAssert(ranges::none_of(_args, [](auto const& _slot) { return _slot.isJunk(); }));
 
-		TargetStats const targetStats(_args, _liveOut);
+		TargetStats const targetStats(_args, _liveOut, _targetSize);
 		constexpr std::size_t maxIterations = 1000;
 		std::size_t i = 0;
-		for (; i < maxIterations && shuffleStep(_stack, _args, _liveOut, targetStats, _generateJunk); ++i) {}
+		for (; i < maxIterations && shuffleStep(_stack, targetStats, _generateJunk); ++i) {}
 		yulAssert(i < maxIterations, fmt::format("Maximum iterations reached on {}", stackToString(_stack.data())));
 	}
 
@@ -83,7 +78,10 @@ private:
 
 	struct TargetStats
 	{
-		TargetStats(std::vector<Slot> const& _args, LivenessAnalysis::LivenessData const& _liveOut)
+		TargetStats(std::vector<Slot> const& _args, LivenessAnalysis::LivenessData const& _liveOut, std::size_t const _targetSize):
+			args(_args),
+			liveOut(_liveOut),
+			targetSize(_targetSize)
 		{
 			targetMinCounts.reserve(_args.size() + _liveOut.size());
 			for (auto const& arg: _args)
@@ -92,34 +90,35 @@ private:
 				++targetMinCounts[Slot::makeValueID(_liveValueId)];
 		}
 
+		std::vector<Slot> const& args;
+		LivenessAnalysis::LivenessData const& liveOut;
+		std::size_t const targetSize;
 		boost::container::flat_map<Slot, size_t> targetMinCounts;
 	};
 	struct Ops
 	{
-		Ops(Stack<Callback>& _stack, std::vector<Slot> const& _args, LivenessAnalysis::LivenessData const& _liveOut, TargetStats const& _targetStats):
-			stackStats(_stack, _args.size()),
+		Ops(Stack<Callback>& _stack, TargetStats const& _targetStats):
+			stackStats(_stack, _targetStats.args.size()),
 			stack(_stack),
-			args(_args),
-			liveOut(_liveOut),
 			targetStats(_targetStats)
 		{}
 
 		bool argsRegionIsCorrect() const
 		{
-			return args.size() <= stack.size() && ranges::equal(
-				stack.data().rbegin(), stack.data().rbegin() + static_cast<std::ptrdiff_t>(args.size()),
-				args.rbegin(), args.rend()
+			return targetStats.targetSize == stack.size() && ranges::equal(
+				stack.data().rbegin(), stack.data().rbegin() + static_cast<std::ptrdiff_t>(targetStats.args.size()),
+				targetStats.args.rbegin(), targetStats.args.rend()
 			);
 		}
 
 		bool requiredInArgs(Slot const& _slot) const
 		{
-			return ranges::find(args, _slot) != ranges::end(args);
+			return ranges::find(targetStats.args, _slot) != ranges::end(targetStats.args);
 		}
 
 		bool requiredInTail(Slot const& _slot) const
 		{
-			return _slot.isValueID() && liveOut.contains(_slot.valueID());
+			return _slot.isValueID() && targetStats.liveOut.contains(_slot.valueID());
 		}
 
 		bool distributionIsCorrect() const
@@ -137,7 +136,7 @@ private:
 
 		size_t targetArgsCount(Slot const& _slot) const
 		{
-			return static_cast<size_t>(ranges::count_if(args, [&](auto const& _arg) { return _arg == _slot; }));
+			return static_cast<size_t>(ranges::count_if(targetStats.args, [&](auto const& _arg) { return _arg == _slot; }));
 		}
 
 		bool stackAdmissible() const
@@ -150,9 +149,14 @@ private:
 			return stackStats.totalCount(_slot) > targetMinCount(_slot); // todo  || stack.canBeFreelyGenerated(_slot)?
 		}
 
-		bool isArgsCompatible(size_t _sourceDepth, size_t _targetDepth) const
+		bool offsetInTargetArgsRegion(size_t _offset) const
 		{
-			return _sourceDepth < stack.size() && _targetDepth < args.size() && stack.slot(_sourceDepth) == args[args.size() - _targetDepth - 1];
+			return _offset >= targetStats.targetSize - targetStats.args.size();
+		}
+
+		bool isArgsCompatible(size_t _sourceOffset, size_t _targetOffset) const
+		{
+			return _sourceOffset < stack.size() && offsetInTargetArgsRegion(_targetOffset) && stack[_sourceOffset] == targetStats.args[_targetOffset - (targetStats.targetSize - targetStats.args.size() - 1 /*todo need -1?*/ )];
 		}
 
 		bool isSourceCompatible(size_t _sourceDepth1, size_t _sourceDepth2) const
@@ -162,7 +166,7 @@ private:
 
 		bool needsMoreSlots() const
 		{
-			for (auto const& arg: args)
+			for (auto const& arg: targetStats.args)
 				if (stackStats.totalCount(arg) < targetMinCount(arg))
 					return true;
 			return false;
@@ -170,8 +174,6 @@ private:
 
 		StackStats stackStats;
 		Stack<Callback> const& stack;
-		std::vector<Slot> const& args;
-		LivenessAnalysis::LivenessData const& liveOut;
 		TargetStats const& targetStats;
 	};
 
@@ -199,7 +201,7 @@ private:
 					for (size_t offset = sourceOffset + 1; offset < _stack.size(); ++offset)
 					{
 						if (_stack[offset] == slot)
-							return std::make_tuple(_stack.size() - offset - 1 >= _ops.args.size(), true);
+							return std::make_tuple(_stack.size() - offset - 1 >= _ops.targetStats.args.size(), true);
 					}
 					return std::make_tuple(false, false);
 				}();
@@ -208,15 +210,18 @@ private:
 				if (haveMoreAboveWithoutArgs)
 					continue;
 
-				// if we need this in args and we have something outside args or we can introduce junk, skip it
+				// if we need this in args and we have the same above but outside args, or we can introduce junk and
+				// there is more of the same further up in the stack, skip it
 				if ((neededInArgs && haveMoreAboveWithoutArgs) || (_generateJunk && haveMoreAbove))
 					continue;
 
 				bool const reachable = sourceDepth < ReachableStackDepth;
-
 				if (reachable)
 				{
-					if (!_ops.isArgsCompatible(0, 0))
+					if (
+						!_ops.requiredInArgs(_stack.top()) ||  // current top can go into tail
+						!_ops.isArgsCompatible(0, 0)
+					)
 					{
 						// top needs to go into tail, swap it
 						_stack.swap(sourceDepth);
@@ -270,21 +275,19 @@ private:
 
 	static bool shuffleStep(
 		Stack<Callback>& _stack,
-		std::vector<Slot> const& _args,
-		LivenessAnalysis::LivenessData const& _liveOut,
 		TargetStats const& _targetStats,
 		bool const _generateJunk
 	)
 	{
-		Ops const ops(_stack, _args, _liveOut, _targetStats);
+		Ops const ops(_stack, _targetStats);
 
-		// Check if we have the required top already
+		// Check if we have the required top and size already
 		if (ops.argsRegionIsCorrect())
 		{
 			// Check if any of the args are required in the tail and not there yet
 			bool const needMoreOfAnyArg = [&]
 			{
-				for (auto const& arg: ops.args)
+				for (auto const& arg: ops.targetStats.args)
 					if (ops.stackStats.totalCount(arg) < ops.targetMinCount(arg))
 						return true;
 				return false;
@@ -293,18 +296,18 @@ private:
 			{
 				// todo whatever we have to dup might not be reachable, check the implications of this in the algorithm:
 				//		we could go stack-too-deep or we could try to compress the args (which might end in a loop?)
-				for (size_t depth: ranges::views::iota(0u, ops.args.size()) | ranges::views::reverse)
+				for (size_t depth: ranges::views::iota(0u, ops.targetStats.args.size()) | ranges::views::reverse)
 					if (ops.stackStats.totalCount(_stack.slot(depth)) < ops.targetMinCount(_stack.slot(depth)))
 					{
-						// todo what about literals? can they be in the tail?
 						// shortcut: if we need more of the top and we only have two args, we can get away with
 						// two ops
-						if (depth == 0 && _args.size() == 2)
+						// todo this might not be a shortcut if we have already reached target size!
+						/*if (depth == 0 && _targetStats.args.size() == 2)
 						{
 							_stack.swap(1);
 							_stack.dup(_stack.slot(1));
 							return true;
-						}
+						}*/
 						_stack.pushOrDup(_stack.slot(depth));
 						return true;
 					}
@@ -314,44 +317,56 @@ private:
 			return false;
 		}
 
-		yulAssert(!_args.empty(), "From here on out, we need slots to be required in the top. Otherwise we should've terminated already.");
+		yulAssert(!_targetStats.args.empty(), "From here on out, we need slots to be required in the top. Otherwise we should've terminated already.");
 
 		// If we no longer need the current stack top, we pop it
-		if (!_stack.empty() && ops.stackStats.argsCount(_stack.top()) > ops.targetArgsCount(_stack.top()) && !ops.isArgsCompatible(0, 0) && !ops.requiredInTail(_stack.top()) && !_stack.top().isJunk())
+		if (
+			!_stack.empty() &&  // stack can't be empty if we want to pop things
+			ops.stackStats.totalCount(_stack.top()) > ops.targetMinCount(_stack.top()) &&  // there's too much of the top
+			!ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) &&  // it's not compatible with its current offset
+			_stack.size() < ops.targetStats.targetSize && // todo we might not want to pop this if we need to reach a higher stack size either ?
+			!_stack.top().isJunk())  // it's not junk (we might want to swap this later)
 		{
-			// fmt::print(">>> POP\n");
 			_stack.pop();
 			return true;
 		}
 
 		// the top is either required in args or in tail or is junk or the stack is empty
-		yulAssert(_stack.empty() || _stack.top().isJunk() || ops.stackStats.argsCount(_stack.top()) > 0 || ops.stackStats.tailCount(_stack.top()) > 0 || ops.isArgsCompatible(0, 0));
+		yulAssert(
+			_stack.empty() ||										// the stack is either empty
+			_stack.top().isJunk() ||								// the stack top is junk
+			ops.stackStats.argsCount(_stack.top()) > 0 ||		// the stack top is ... required in args
+			ops.stackStats.tailCount(_stack.top()) > 0 ||		//					... required in tail
+			ops.isArgsCompatible(_stack.size()-1, _stack.size()-1)		// ... in position (todo this should be implied by the two above)
+		);
 
 		// if the top is junk and popping it fixes more positions in args than not popping it, pop it, next step
 		// want: [arg3, arg2, arg1]
 		// have: [arg3, arg2, arg1, JUNK]
 		// -> popping JUNK fixes three arg positions immediately
-		if (!_stack.empty() && _stack.top().isJunk())
+		// todo this doesnt really work anymore w/ target size
+		/*if (!_stack.empty() && _stack.top().isJunk())
 		{
 			std::ptrdiff_t score = 0;
 			// check how many positions in args are currently fine
-			for (size_t depth = 0; depth < std::min(ops.args.size(), _stack.size()); ++depth)
-				score += ops.isArgsCompatible(depth, depth);
+			for (size_t depth = 0; depth < std::min(ops.targetStats.args.size(), _stack.size()); ++depth)
+				score += ops.isArgsCompatible(_stack.size() - depth - 1, _stack.size() - depth - 1);
 			// check how many positions we'd fix by popping the top
-			for (size_t depth = 0; depth < std::min(ops.args.size(), _stack.size()); ++depth)
-				score -= ops.isArgsCompatible(depth + 1, depth);
+			for (size_t depth = 0; depth < std::min(ops.targetStats.args.size(), _stack.size()); ++depth)
+				score -= ops.isArgsCompatible(_stack.size() - depth - 2, depth);
 			if (score < 0)
 			{
 				_stack.pop();
 				return true;
 			}
-		}
+		}*/
 
 		// if there is any slot that we need more of (in args), dup/push it now
-		for (auto const& arg: _args)
+		for (auto const& arg: _targetStats.args)
 		{
-			if (ops.targetMinCount(arg) > ops.stackStats.totalCount(arg))
+			if (ops.stackStats.totalCount(arg) < ops.targetMinCount(arg))
 			{
+				// todo dupDeepSlotIfRequired needs checking
 				if (!dupDeepSlotIfRequired(ops, _stack, _generateJunk))
 				{
 					_stack.pushOrDup(arg);
@@ -360,6 +375,7 @@ private:
 			}
 		}
 
+		// todo i came until here
 		// if the top is out of position and required in args
 		if (
 			!_stack.empty() &&
@@ -374,7 +390,7 @@ private:
 				// required for the tail), try duping a deeper element
 				if (ops.isArgsCompatible(0, 1) && !ops.needsMoreSlots())
 				{
-					if (ops.requiredInTail(_args.back()) && ops.stackStats.argsCount(_args.back()) < ops.targetArgsCount(_args.back())) //
+					if (ops.requiredInTail(_targetStats.args.back()) && ops.stackStats.argsCount(_targetStats.args.back()) < ops.targetArgsCount(_targetStats.args.back())) //
 					{
 						// dup up whatever wants to be at the top
 						for (size_t depth = 1; depth < ReachableStackDepth && depth < _stack.size(); ++depth)
@@ -386,11 +402,11 @@ private:
 									return true;
 								}
 							}
-						if (_stack.canBeFreelyGenerated(_args.back()))
+						if (_stack.canBeFreelyGenerated(_targetStats.args.back()))
 						{
 							if (!dupDeepSlotIfRequired(ops, _stack, _generateJunk))
 							{
-								_stack.push(_args.back());
+								_stack.push(_targetStats.args.back());
 								return true;
 							}
 						}
@@ -400,19 +416,19 @@ private:
 
 			// if we can introduce junk, just try to dup it up
 			if (_generateJunk && dupDeepSlotIfRequired(ops, _stack, _generateJunk))
-				_stack.pushOrDup(_args.back());
+				_stack.pushOrDup(_targetStats.args.back());
 
 			// if we need more of whatever goes to the top and it's reachable, just dup it
-			if (ops.targetMinCount(_args.back()) > ops.stackStats.totalCount(_args.back()))
-				if (auto const depth = _stack.slotDepth(_args.back()))
+			if (ops.targetMinCount(_targetStats.args.back()) > ops.stackStats.totalCount(_targetStats.args.back()))
+				if (auto const depth = _stack.slotDepth(_targetStats.args.back()))
 					if (*depth < ReachableStackDepth)
 					{
-						_stack.dup(_args.back());
+						_stack.dup(_targetStats.args.back());
 						return true;
 					}
 
 			// try finding a reachable out-of-position target position that, if swapped to, also fixes the top
-			for (size_t depth = 1; depth < std::min(_stack.size(), ops.args.size()); ++depth)
+			for (size_t depth = 1; depth < std::min(_stack.size(), ops.targetStats.args.size()); ++depth)
 				if (ops.isArgsCompatible(depth, 0) && ops.isArgsCompatible(0, depth) && !ops.isArgsCompatible(depth, depth))
 				{
 					_stack.swap(depth);
@@ -420,15 +436,15 @@ private:
 				}
 
 			// if the top can be freely generated and we don't already have enough of it, generate it
-			if (_stack.canBeFreelyGenerated(_args.back()) && ops.stackStats.totalCount(_args.back()) < ops.targetMinCount(_args.back()))
+			if (_stack.canBeFreelyGenerated(_targetStats.args.back()) && ops.stackStats.totalCount(_targetStats.args.back()) < ops.targetMinCount(_targetStats.args.back()))
 			{
-				_stack.push(_args.back());
+				_stack.push(_targetStats.args.back());
 				return true;
 			}
 
 
 			// otherwise take the deepest args target slot that doesn’t hold an identical value and isn't in position
-			for (size_t depth = 1; depth < std::min(_stack.size(), ops.args.size()); ++depth)
+			for (size_t depth = 1; depth < std::min(_stack.size(), ops.targetStats.args.size()); ++depth)
 				if (ops.isArgsCompatible(0, depth) && !ops.isSourceCompatible(0, depth) && !ops.isArgsCompatible(depth, depth))
 				{
 					_stack.swap(depth);
@@ -445,7 +461,7 @@ private:
 				}
 
 			// try finding a reachable out-of-position arg slot that fixes the top
-			for (size_t depth = 1; depth < std::min(_stack.size(), ops.args.size()); ++depth)
+			for (size_t depth = 1; depth < std::min(_stack.size(), ops.targetStats.args.size()); ++depth)
 				if (ops.isArgsCompatible(depth, 0) && !ops.isArgsCompatible(depth, depth))
 				{
 					_stack.swap(depth);
@@ -476,7 +492,7 @@ private:
 			for (size_t depth: ranges::views::iota(1u, _stack.size()) | ranges::views::reverse)
 				// It makes sense to swap to a lower position, if
 				if (
-					(depth >= _args.size() || !ops.isArgsCompatible(depth, depth)) && // The lower slot is not already in position.
+					(depth >= _targetStats.args.size() || !ops.isArgsCompatible(depth, depth)) && // The lower slot is not already in position.
 					_stack.slot(depth) != _stack.top() && // We would not just swap identical slots.
 					ops.isArgsCompatible(depth, 0) // The lower position wants to be at the top
 				)
@@ -501,9 +517,9 @@ private:
 					_stack.swap(depth);
 					return true;
 				}
-			if (_stack.canBeFreelyGenerated(_args.back()))
+			if (_stack.canBeFreelyGenerated(_targetStats.args.back()))
 			{
-				_stack.pushOrDup(_args.back());
+				_stack.pushOrDup(_targetStats.args.back());
 				return true;
 			}
 		}
@@ -511,7 +527,7 @@ private:
 		yulAssert(_stack.empty() || ops.isArgsCompatible(0, 0) || ops.requiredInTail(_stack.top()) || _stack.top().isJunk(), fmt::format("Current stack: {}", stackToString(_stack.data())));
 
 		// if there is any slot we need more of to populate args, dup that, next step
-		for (auto const& arg: ops.args)
+		for (auto const& arg: ops.targetStats.args)
 			if (ops.targetMinCount(arg) > ops.stackStats.totalCount(arg))
 				if (!dupDeepSlotIfRequired(ops, _stack, _generateJunk))
 				{
@@ -535,7 +551,7 @@ private:
 
 		// Swap up any reachable slot that is still out of position.
 		for (size_t depth: swappableDepthRange)
-			if (depth < _args.size())
+			if (depth < _targetStats.args.size())
 			{
 				if (!ops.isArgsCompatible(depth, depth) && _stack.slot(depth) != _stack.top())
 				{

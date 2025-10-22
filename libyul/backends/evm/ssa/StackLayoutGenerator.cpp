@@ -1,13 +1,14 @@
 #include "AStarShuffler.h"
 #include "ExactShuffler.h"
-#include "libyul/backends/evm/ssa/LivenessAnalysis.h"
 #include "libyul/backends/evm/SSACFGStackShuffler.h"
+#include "libyul/backends/evm/ssa/LivenessAnalysis.h"
 #include "range/v3/algorithm/count.hpp"
 #include "range/v3/algorithm/equal.hpp"
 #include "range/v3/algorithm/min_element.hpp"
 #include "range/v3/algorithm/none_of.hpp"
 #include "range/v3/algorithm/replace.hpp"
 #include "range/v3/algorithm/sort.hpp"
+#include "range/v3/numeric/iota.hpp"
 #include "range/v3/view/drop.hpp"
 
 #include <libyul/backends/evm/ssa/StackLayoutGenerator.h>
@@ -350,7 +351,35 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		if constexpr(debugOutput)
 			std::cout << "{ " << stackToString(liveOutWithoutOutputs | ranges::views::transform(Slot::makeValueID) | ranges::to<std::vector>, m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ") -> " << std::flush;
 
-		OperationForwardShuffler<StackManipulationCallbacks>::shuffle(stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
+		std::size_t const targetSize = [&]
+		{
+			int const minSize = static_cast<int>(liveOutWithoutOutputs.size() + requiredStackTop.size());
+			int const pivot = std::max(minSize, static_cast<int>(stack.size()));
+
+			std::size_t currentMinNumOps = std::numeric_limits<std::size_t>::max();
+
+			auto result = static_cast<std::size_t>(pivot);
+			StackData data;
+			data.reserve(result + requiredStackTop.size());
+			for (int delta: ranges::views::iota(-static_cast<int>(requiredStackTop.size()), static_cast<int>(requiredStackTop.size()) + 1))
+			{
+				auto const tryTargetSize = pivot + delta;
+				if (tryTargetSize < 0 || tryTargetSize < minSize)
+					continue;
+
+				// copy the current data
+				data = stack.data();
+				StackType countOpsStack (data, {});
+				OperationForwardShuffler<StackManipulationCallbacks>::shuffle(countOpsStack, requiredStackTop, opLiveOutWithoutOutputs, static_cast<std::size_t>(tryTargetSize), m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
+				if (countOpsStack.callbacks().numOps < currentMinNumOps)
+				{
+					currentMinNumOps = countOpsStack.callbacks().numOps;
+					result = static_cast<std::size_t>(tryTargetSize);
+				}
+			}
+			return result;
+		}();
+		OperationForwardShuffler<StackManipulationCallbacks>::shuffle(stack, requiredStackTop, opLiveOutWithoutOutputs, targetSize, m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
 
 		m_stackLayout[_blockId].operationIn.push_back(currentStackData);
 
