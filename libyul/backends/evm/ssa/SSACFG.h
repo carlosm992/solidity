@@ -279,8 +279,6 @@ public:
 		return *idx;
 	}
 
-	std::string valueDescription(ValueId const& _valueId) const;
-
 	std::string toDot(
 		bool _includeDiGraphDefinition=true,
 		std::optional<size_t> _functionIndex=std::nullopt,

@@ -69,7 +69,7 @@ struct SlotCanBeFreelyGenerated
 	bool operator()(Slot const& _slot) const
 	{
 		if (std::holds_alternative<SSACFG::ValueId>(_slot))
-			return m_cfg->isLiteralValue(std::get<SSACFG::ValueId>(_slot));
+			return std::get<SSACFG::ValueId>(_slot).isLiteral();
 		return std::holds_alternative<JunkSlot>(_slot) || std::holds_alternative<FunctionReturnLabel>(_slot);
 	}
 

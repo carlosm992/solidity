@@ -72,7 +72,7 @@ std::vector<StackTooDeepError> SSACFGEVMCodeTransform::run(
 		std::cout << "--------------------\n";
 		std::cout << "Running SSACFGEVMCodeTransform" << std::endl;
 		std::cout << "--------------------\n";
-		fmt::print("{}\n", _liveness.toDot(nullptr)); // &mainCodeTransform.m_stackLayout
+		fmt::print("{}\n", _liveness.toDot());
 		std::fflush(nullptr);
 	}
 

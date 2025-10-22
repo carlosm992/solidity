@@ -30,7 +30,7 @@ std::string ssa::slotToString(StackSlot const& _slot)
 {
 	return std::visit(util::GenericVisitor{
 		[&](SSACFG::ValueId const _value) {
-			return "v" + std::to_string(_value.value);
+			return "v" + std::to_string(_value.value());
 		},
 		[](AbstractAssembly::LabelID const _label) {
 			return "LABEL[" + std::to_string(_label) + "]";

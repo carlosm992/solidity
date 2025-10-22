@@ -56,7 +56,7 @@ private:
 				else
 					++histogramArgs[slot];
 				if (_stack.size() - i - 1 < ReachableStackDepth)
-					++histogramReachable[slot]++;
+					++histogramReachable[slot];
 			}
 		}
 
