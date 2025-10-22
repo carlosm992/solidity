@@ -396,13 +396,14 @@ private:
 		// todo i came until here
 		// if the top is out of position and required in args
 		if (
-			!_stack.empty() &&
-			!ops.isArgsCompatible(0, 0) &&
-			ops.stackStats.argsCount(_stack.top()) <= ops.targetArgsCount(_stack.top())
+			!_stack.empty() &&  // if we have an empty stack, we don't need to go down this branch any further
+			!ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) &&  // the stack top is not in the args region or inside but out of position
+			ops.stackStats.argsCount(_stack.top()) <= ops.targetArgsCount(_stack.top())  // the stack top is needed in args at least as often as is the case right now
 		)
 		{
 			// shortcut
-			{
+			// todo see if this still works w/ fixed target size
+			/*{
 				// if the top is required in the second slot position and we require something at the top that isn’t
 				// already sufficiently often in the args section and (we can introduce junk or the target top is also
 				// required for the tail), try duping a deeper element
@@ -430,7 +431,7 @@ private:
 						}
 					}
 				}
-			}
+			}*/
 
 			// if we can introduce junk, just try to dup it up
 			if (_generateJunk && dupDeepSlotIfRequired(ops, _stack, _generateJunk))
