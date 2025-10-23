@@ -162,7 +162,7 @@ private:
 
 		bool offsetInTargetArgsRegion(size_t _offset) const
 		{
-			return _offset >= targetStats.targetSize - targetStats.args.size();
+			return _offset >= targetStats.targetSize - targetStats.args.size() && _offset < targetStats.targetSize;
 		}
 
 		bool isArgsCompatible(size_t _sourceOffset, size_t _targetOffset) const
@@ -337,6 +337,7 @@ private:
 		}
 
 		yulAssert(!_targetStats.args.empty(), "From here on out, we need slots to be required in the top. Otherwise we should've terminated already.");
+		yulAssert(_targetStats.targetSize > 0, "Direct consequence from args not being empty");
 
 		// If we no longer need the current stack top, we pop it
 		if (
@@ -393,7 +394,6 @@ private:
 			}
 		}
 
-		// todo i came until here
 		// if the top is out of position and required in args
 		if (
 			!_stack.empty() &&  // if we have an empty stack, we don't need to go down this branch any further
@@ -433,11 +433,11 @@ private:
 				}
 			}*/
 
-			// if we can introduce junk, just try to dup it up
-			if (_generateJunk && dupDeepSlotIfRequired(ops, _stack, _generateJunk))
+			// if we can introduce junk and we're not overshooting the target size, just try to dup it up
+			if (_generateJunk && _stack.size() < _targetStats.targetSize && dupDeepSlotIfRequired(ops, _stack, _generateJunk))
 				_stack.pushOrDup(_targetStats.args.back());
 
-			// if we need more of whatever goes to the top and it's reachable, just dup it
+			// if we need more of whatever goes to the top, and it's reachable, just dup it
 			if (ops.targetMinCount(_targetStats.args.back()) > ops.stackStats.totalCount(_targetStats.args.back()))
 				if (auto const depth = _stack.slotDepth(_targetStats.args.back()))
 					if (*depth < ReachableStackDepth)
@@ -447,10 +447,14 @@ private:
 					}
 
 			// try finding a reachable out-of-position target position that, if swapped to, also fixes the top
-			for (size_t depth = 1; depth < std::min(_stack.size(), ops.targetStats.args.size()); ++depth)
-				if (ops.isArgsCompatible(depth, 0) && ops.isArgsCompatible(0, depth) && !ops.isArgsCompatible(depth, depth))
+			for (std::size_t offset = ops.targetStats.targetSize - ops.targetStats.args.size(); offset < ops.targetStats.targetSize && offset < _stack.size(); ++offset)
+				if (
+					ops.targetStats.targetSize == _stack.size() &&
+					ops.isArgsCompatible(offset, ops.targetStats.targetSize - 1) &&  // slot at offset is compatible with target top
+					ops.isArgsCompatible(_stack.size() - 1, offset) &&  // top also fixes slot at offset
+					!ops.isArgsCompatible(offset, offset))  // offset slot isn't in the right position already
 				{
-					_stack.swap(depth);
+					_stack.swap(_stack.size() - offset - 1);
 					return true;
 				}
 
@@ -460,7 +464,6 @@ private:
 				_stack.push(_targetStats.args.back());
 				return true;
 			}
-
 
 			// otherwise take the deepest args target slot that doesn’t hold an identical value and isn't in position
 			for (size_t depth = 1; depth < std::min(_stack.size(), ops.targetStats.args.size()); ++depth)
@@ -499,7 +502,11 @@ private:
 			yulAssert(false, fmt::format("stack too deep: {}", stackToString(_stack.data())));
 		}
 
-		yulAssert(_stack.empty() || _stack.top().isJunk() || ops.isArgsCompatible(0, 0) || ops.requiredInTail(_stack.top()));
+		// stack size > target size cannot be true anymore, since if the source top is no longer required,
+		// we already popped it, and if it is required, we already swapped it down to a suitable target position.
+		yulAssert(_stack.size() <= _targetStats.targetSize);
+
+		yulAssert(_stack.empty() || _stack.top().isJunk() || ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) || ops.requiredInTail(_stack.top()));
 
 		// if there is a slot that needs to be swapped up or duped but is on the verge of being unreachable, try swapping/duping it
 		if (dupDeepSlotIfRequired(ops, _stack, _generateJunk))
