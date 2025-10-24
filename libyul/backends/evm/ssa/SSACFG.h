@@ -46,7 +46,7 @@ class LivenessAnalysis;
 class SSACFG
 {
 public:
-	SSACFG() = default;
+	SSACFG(): m_zero(newLiteral(nullptr, 0)) {}
 	SSACFG(SSACFG const&) = delete;
 	SSACFG(SSACFG&&) = delete;
 	SSACFG& operator=(SSACFG const&) = delete;
@@ -247,9 +247,9 @@ public:
 
 	ValueId unreachableValue()
 	{
-		if (!m_unreachableValue)
+		if (!m_unreachableValue.hasValue())
 			m_unreachableValue = ValueId::makeUnreachable();
-		return *m_unreachableValue;
+		return m_unreachableValue;
 	}
 
 	ValueId newLiteral(langutil::DebugData::ConstPtr _debugData, u256 _value)
@@ -261,7 +261,6 @@ public:
 			yulAssert(valueId.hasValue() && m_literals[valueId.value()].value == _value);
 			return valueId;
 		}
-
 
 		m_literals.emplace_back(LiteralValue{std::move(_debugData), std::move(_value)});
 		auto const value = m_literals.size() - 1;
@@ -306,12 +305,18 @@ public:
 		return m_variables.at(_valueId.value());
 	}
 
+	ValueId const& zero() const
+	{
+		return m_zero;
+	}
+
 private:
 	std::vector<LiteralValue> m_literals;
 	std::map<u256, ValueId> m_literalMapping;
 	std::vector<PhiValue> m_phis;
 	std::vector<VariableValue> m_variables;
-	std::optional<ValueId> m_unreachableValue;
+	ValueId m_unreachableValue;
+	ValueId m_zero;
 public:
 	langutil::DebugData::ConstPtr debugData;
 	BlockId entry = BlockId{0};
