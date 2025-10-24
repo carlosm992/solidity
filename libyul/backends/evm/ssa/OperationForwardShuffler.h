@@ -92,7 +92,8 @@ private:
 		TargetStats(std::vector<Slot> const& _args, LivenessAnalysis::LivenessData const& _liveOut, std::size_t const _targetSize):
 			args(_args),
 			liveOut(_liveOut),
-			targetSize(_targetSize)
+			targetSize(_targetSize),
+			tailSize(_targetSize - _args.size())
 		{
 			targetMinCounts.reserve(_args.size() + _liveOut.size());
 			for (auto const& arg: _args)
@@ -104,6 +105,7 @@ private:
 		std::vector<Slot> const& args;
 		LivenessAnalysis::LivenessData const& liveOut;
 		std::size_t const targetSize;
+		std::size_t const tailSize;
 		boost::container::flat_map<Slot, size_t> targetMinCounts;
 	};
 	struct Ops
@@ -574,7 +576,7 @@ private:
 				{
 					if (*dupDepth < ReachableStackDepth)
 					{
-						_stack.dup(*dupDepth);
+						_stack.dup(_stack.slot(*dupDepth));
 						return true;
 					}
 
@@ -600,27 +602,27 @@ private:
 			}
 
 			// dup up the deepest slot that is required in args (or compress if unreachable)
-			for (size_t depth: ranges::views::iota(0u, _stack.size()) | ranges::views::reverse)
+			for (size_t offset: ranges::views::iota(0u, _stack.size()) | ranges::views::reverse)
 			{
 				// if we need the slot in args and there's no slot of the same kind further up
-				if (ops.requiredInArgs(_stack[depth]) && std::find(_stack.begin() + depth + 1, _stack.end(), _stack[depth]) == _stack.end())
+				if (ops.requiredInArgs(_stack[offset]) && std::find(_stack.begin() + offset + 1, _stack.end(), _stack[offset]) == _stack.end())
 				{
 					// dup if we can
-					if (depth < ReachableStackDepth)
+					if (ops.sourceOffsetToDepth(offset) < ReachableStackDepth)
 					{
-						_stack.dup(_stack[depth]);
+						_stack.dup(_stack[offset]);
 						return true;
 					}
 
 					// swap if top isn't needed
-					if (depth == ReachableStackDepth && !ops.requiredInArgs(_stack.top()))
+					if (offset == ReachableStackDepth && !ops.requiredInArgs(_stack.top()))
 					{
-						_stack.swap(depth);
+						_stack.swap(ops.sourceOffsetToDepth(offset));
 						return true;
 					}
 
 					// can it be freely generated but unreachable? just push a 0, we can push it later
-					if (_stack.canBeFreelyGenerated(_stack[depth]))
+					if (_stack.canBeFreelyGenerated(_stack[offset]))
 					{
 						_stack.push(Stack<Callback>::Slot::makeJunk());
 						return true;
@@ -631,7 +633,7 @@ private:
 						return true;
 
 					// stack too deep
-					_stack.dup(_stack[depth]);
+					_stack.dup(_stack[offset]);
 				}
 			}
 
@@ -641,52 +643,122 @@ private:
 
 		// we have filled the stack so it reaches into the args region
 		yulAssert(_stack.size() > _targetStats.targetSize - _targetStats.args.size());
+		// the stack size does not exceed the target size
+		yulAssert(_stack.size() <= _targetStats.targetSize);
+
+		// stack can't be empty anymore at this point, as its size is so that at least one element is in the
+		// args region and the args region is non-empty
+		yulAssert(!_stack.empty());
 
 		// If the top isn’t correct and not required in args,
 		// find a slot that is compatible with the target top and swap it up, next step
 		if (
-			!_stack.empty() &&  // the stack isnt empty
-			ops.offsetInTargetArgsRegion(_stack.size() - 1) &&  // the top is in the target args region
 			!ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) &&  // it's not in position
 			!ops.requiredInArgs(_stack.top())  // not needed in args at all, can be swapped into tail
 		)
 		{
-			for (size_t depth: ranges::views::iota(1u, _stack.size()) | ranges::views::reverse)
+			for (size_t offset: ranges::views::iota(0u, _stack.size() - 1) | ranges::views::reverse)
 				// It makes sense to swap to a lower position, if
 				if (
-					(depth >= _targetStats.args.size() || !ops.isArgsCompatible(depth, depth)) && // The lower slot is not already in position.
-					_stack.slot(depth) != _stack.top() && // We would not just swap identical slots.
-					ops.isArgsCompatible(depth, 0) // The lower position wants to be at the top
+					(!ops.offsetInTargetArgsRegion(offset) || !ops.isArgsCompatible(offset, offset)) && // The lower slot is not already in position.
+					!ops.isSourceCompatible(offset, _stack.size() - 1) && // We would not just swap identical slots.
+					ops.isArgsCompatible(offset, _stack.size() - 1) && // The lower position wants to be at the top
+					std::find(_stack.begin() + offset + 1, _stack.begin() + _targetStats.tailSize, _stack[offset]) == _stack.end()  // there is no same thing in the tail part further up the stack
 				)
 				{
-					// We cannot swap that deep.
-					if (depth > ReachableStackDepth)
+					if (offset <= ReachableStackDepth)
 					{
-						// If there is a reachable slot to be removed, park the current top there.
-						for (size_t swapDepth: ranges::views::iota(1u, ReachableStackDepth + 1u) | ranges::views::reverse)
-							if (ops.canBePopped(_stack.slot(swapDepth)))
-							{
-								_stack.swap(swapDepth);
-								if (_stack.top().isJunk())
-									// Usually we keep a slot that is to-be-removed, if the current top is arbitrary.
-									// However, since we are in a stack-too-deep situation, pop it immediately
-									// to compress the stack (we can always push back junk in the end).
-									_stack.pop();
-								return true;
-							}
-						// Otherwise, we rely on stack compression or stack-to-memory.
+						_stack.swap(ops.sourceOffsetToDepth(offset));
+						return true;
 					}
-					_stack.swap(depth);
+
+					// We cannot swap that deep.
+					if (ops.compress())
+						return true;
+
+					if (_stack.canBeFreelyGenerated(_stack[offset]))
+					{
+						_stack.pop();
+						_stack.push(_stack[offset]);
+						return true;
+					}
+
+					// stack too deep
+					_stack.swap(ops.sourceOffsetToDepth(offset));
 					return true;
 				}
-			if (_stack.canBeFreelyGenerated(_targetStats.args.back()))
+
+			// from here on we didn't find a suitable slot in the tail to swap up, so let's get rid of the top
+
+			// the top isn't correct and not required in args and if the stack top isn't required in tail
+			// we can just pop it and return true
+			if (!ops.requiredInTail(_stack.top()))
 			{
-				_stack.pushOrDup(_targetStats.args.back());
+				_stack.pop();
+				return true;
+			}
+
+			// the top is required in tail and already there, just pop it too
+			if (ops.requiredInTail(_stack.top()) && ops.stackStats.tailCount(_stack.top()) > 0)
+			{
+				_stack.pop();
+				return true;
+			}
+
+			// it is required in tail and not already there, try finding something that can be popped
+			for (size_t tailOffset: ranges::views::iota(0u, _targetStats.tailSize) | ranges::views::reverse)
+			{
+				if (ops.canBePopped(_stack[tailOffset]))
+				{
+					if (ops.sourceOffsetToDepth(tailOffset) <= ReachableStackDepth)
+					{
+						_stack.swap(ops.sourceOffsetToDepth(tailOffset));
+						_stack.pop();
+						return true;
+					}
+				}
+			}
+
+			// it is required in tail and not already there, try finding something that can be popped by pushing it again (bad case)
+			for (size_t tailOffset: ranges::views::iota(0u, _targetStats.tailSize) | ranges::views::reverse)
+			{
+				if (_stack.canBeFreelyGenerated(_stack[tailOffset]))
+				{
+					if (ops.sourceOffsetToDepth(tailOffset) <= ReachableStackDepth)
+					{
+						_stack.swap(ops.sourceOffsetToDepth(tailOffset));
+						_stack.pop();
+						return true;
+					}
+				}
+			}
+
+			// now we are in a situation where the only thing we can pop is too deep in stack to reach
+			// let's swap with it anyway and stack-to-deep handling deal with it
+			for (size_t tailOffset: ranges::views::iota(0u, _targetStats.tailSize) | ranges::views::reverse)
+			{
+				if (ops.canBePopped(_stack[tailOffset]))
+				{
+					_stack.swap(ops.sourceOffsetToDepth(tailOffset));
+					_stack.pop();
+					return true;
+				}
+			}
+
+			yulAssert(false, "the top is not required in args but required in tail but we can't pop _anything_ in tail, this shouldn't be possible.");
+		}
+
+		yulAssert(_stack.empty() || ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) || ops.requiredInTail(_stack.top()) || _stack.top().isJunk(), fmt::format("Current stack: {}", stackToString(_stack.data())));
+
+		// if we haven't matched the target size, try to dup things into their right position
+		if (_stack.size() < _targetStats.targetSize)
+		{
+			if (!dupDeepSlotIfRequired(ops, _generateJunk))
+			{
+				_stack.pushOrDup(_targetStats.args[_stack.size() - _targetStats.tailSize]);
 				return true;
 			}
 		}
-
-		yulAssert(_stack.empty() || ops.isArgsCompatible(0, 0) || ops.requiredInTail(_stack.top()) || _stack.top().isJunk(), fmt::format("Current stack: {}", stackToString(_stack.data())));
 
 		// if there is any slot we need more of to populate args, dup that, next step
 		for (auto const& arg: ops.targetStats.args)
@@ -700,32 +772,34 @@ private:
 		// now all required slots are present in required quantity
 		for (auto const& [targetSlot, targetSlotMinCount]: ops.targetStats.targetMinCounts)
 			yulAssert(ops.stackStats.totalCount(targetSlot) >= targetSlotMinCount);
+		// also the size should be correct
+		yulAssert(_stack.size() == _targetStats.targetSize);
 
-		auto swappableDepthRange = ranges::views::iota(0u, std::min(ReachableStackDepth + 1u, _stack.size())) | ranges::views::reverse;
+		auto swappableOffsets = ranges::views::iota(_stack.size() > ReachableStackDepth + 1u ? _stack.size() - (ReachableStackDepth + 1u) : 0u, _stack.size());
 
 		// If we find a lower slot that is out of position, but also compatible with the top, swap that up.
-		for (size_t depth: swappableDepthRange)
-			if (!ops.isArgsCompatible(depth, depth) && ops.isArgsCompatible(0, depth))
+		for (size_t offset: swappableOffsets)
+			if (!ops.isArgsCompatible(offset, offset) && ops.isArgsCompatible(_stack.size() - 1, offset))
 			{
-				_stack.swap(depth);
+				_stack.swap(offset);
 				return true;
 			}
 
 		// Swap up any reachable slot that is still out of position.
-		for (size_t depth: swappableDepthRange)
-			if (depth < _targetStats.args.size())
+		for (size_t offset: swappableOffsets)
+			if (ops.sourceOffsetToDepth(offset) < _targetStats.args.size())
 			{
-				if (!ops.isArgsCompatible(depth, depth) && _stack.slot(depth) != _stack.top())
+				if (!ops.isArgsCompatible(offset, offset) && ops.isSourceCompatible(offset, _stack.size() - 1))
 				{
-					_stack.swap(depth);
+					_stack.swap(ops.sourceOffsetToDepth(offset));
 					return true;
 				}
 			}
 			else
 			{
-				if (ops.requiredInArgs(_stack.slot(depth)) && ops.stackStats.argsCount(_stack.slot(depth)) < ops.targetArgsCount(_stack.slot(depth)))
+				if (ops.requiredInArgs(_stack[offset]) && ops.stackStats.argsCount(_stack[offset]) < ops.targetArgsCount(_stack[offset]))
 				{
-					_stack.swap(depth);
+					_stack.swap(ops.sourceOffsetToDepth(offset));
 					return true;
 				}
 			}
@@ -739,7 +813,7 @@ private:
 		}
 
 		// If any reachable slot is merely kept, since the target slot is arbitrary, swap it up and pop it.
-		for (size_t depth: swappableDepthRange)
+		for (size_t depth: swappableOffsets)
 			if (_stack.slot(depth).isJunk())
 			{
 				_stack.swap(depth);
