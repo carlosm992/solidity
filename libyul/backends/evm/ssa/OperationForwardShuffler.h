@@ -169,7 +169,7 @@ private:
 
 		bool isArgsCompatible(size_t _sourceOffset, size_t _targetOffset) const
 		{
-			return _sourceOffset < stack.size() && offsetInTargetArgsRegion(_targetOffset) && stack[_sourceOffset] == targetStats.args[_targetOffset - (targetStats.targetSize - targetStats.args.size() - 1 /*todo need -1?*/ )];
+			return _sourceOffset < stack.size() && offsetInTargetArgsRegion(_targetOffset) && stack[_sourceOffset] == targetStats.args[_targetOffset - targetStats.tailSize];
 		}
 
 		bool isSourceCompatible(size_t _sourceOffset1, size_t _sourceOffset2) const
@@ -549,9 +549,18 @@ private:
 			yulAssert(false, fmt::format("stack too deep: {}", stackToString(_stack.data())));
 		}
 
+		// if we're still too large, there should be something we can dispose of
+		if (_stack.size() > _targetStats.targetSize)
+		{
+			if (ops.compress())
+				return true;
+
+			yulAssert("Couldn't reach target size.");
+		}
+
 		// stack size > target size cannot be true anymore, since if the source top is no longer required,
 		// we already popped it, and if it is required in args, we already swapped it down to a suitable target position.
-		yulAssert(_stack.size() <= _targetStats.targetSize);
+		yulAssert(_stack.size() <= _targetStats.targetSize, fmt::format("oops: {}, {}", _targetStats.targetSize, stackToString(_stack.data())));
 
 		yulAssert(
 			_stack.empty() ||  // stack can be empty
@@ -562,9 +571,9 @@ private:
 
 		// if the stack is so small that it's not reaching into the args region, try to dup something up that either fixes
 		// the top (in the case of size is just below args) or just dup the deepest elem
-		{
+		if (_stack.size() <= _targetStats.tailSize) {
 			// the stack is so that the top is just below the args region
-			if (_stack.size() == _targetStats.targetSize - _targetStats.args.size())
+			if (_stack.size() == _targetStats.tailSize)
 			{
 				// if there's something that will run out of scope by duping, dup that now
 				if (dupDeepSlotIfRequired(ops, _generateJunk))
@@ -607,17 +616,17 @@ private:
 				// if we need the slot in args and there's no slot of the same kind further up
 				if (ops.requiredInArgs(_stack[offset]) && std::find(_stack.begin() + offset + 1, _stack.end(), _stack[offset]) == _stack.end())
 				{
-					// dup if we can
-					if (ops.sourceOffsetToDepth(offset) < ReachableStackDepth)
-					{
-						_stack.dup(_stack[offset]);
-						return true;
-					}
-
 					// swap if top isn't needed
 					if (offset == ReachableStackDepth && !ops.requiredInArgs(_stack.top()))
 					{
 						_stack.swap(ops.sourceOffsetToDepth(offset));
+						return true;
+					}
+
+					// dup if we can
+					if (ops.sourceOffsetToDepth(offset) < ReachableStackDepth)
+					{
+						_stack.dup(_stack[offset]);
 						return true;
 					}
 
@@ -657,13 +666,13 @@ private:
 			!ops.requiredInArgs(_stack.top())  // not needed in args at all, can be swapped into tail
 		)
 		{
-			for (size_t offset: ranges::views::iota(0u, _stack.size() - 1) | ranges::views::reverse)
+			for (size_t offset: ranges::views::iota(0u, _stack.size() - 1))
 				// It makes sense to swap to a lower position, if
 				if (
 					(!ops.offsetInTargetArgsRegion(offset) || !ops.isArgsCompatible(offset, offset)) && // The lower slot is not already in position.
 					!ops.isSourceCompatible(offset, _stack.size() - 1) && // We would not just swap identical slots.
 					ops.isArgsCompatible(offset, _stack.size() - 1) && // The lower position wants to be at the top
-					std::find(_stack.begin() + offset + 1, _stack.begin() + _targetStats.tailSize, _stack[offset]) == _stack.end()  // there is no same thing in the tail part further up the stack
+					std::find(_stack.begin() + offset + 1, _stack.begin() + _targetStats.tailSize, _stack[offset]) == _stack.begin() + _targetStats.tailSize  // there is no same thing in the tail part further up the stack
 				)
 				{
 					if (offset <= ReachableStackDepth)
@@ -704,6 +713,9 @@ private:
 				_stack.pop();
 				return true;
 			}
+
+			// todo the top is required in tail and not already there, bring it down by swapping something
+			//		up that wants to be in args or can be popped
 
 			// it is required in tail and not already there, try finding something that can be popped
 			for (size_t tailOffset: ranges::views::iota(0u, _targetStats.tailSize) | ranges::views::reverse)
@@ -779,9 +791,13 @@ private:
 
 		// If we find a lower slot that is out of position, but also compatible with the top, swap that up.
 		for (size_t offset: swappableOffsets)
-			if (!ops.isArgsCompatible(offset, offset) && ops.isArgsCompatible(_stack.size() - 1, offset))
+			if (
+				!ops.isArgsCompatible(offset, offset) &&
+				!ops.isSourceCompatible(offset, _stack.size() - 1) &&
+				ops.isArgsCompatible(offset, _stack.size() - 1)
+			)
 			{
-				_stack.swap(offset);
+				_stack.swap(ops.sourceOffsetToDepth(offset));
 				return true;
 			}
 
@@ -789,7 +805,7 @@ private:
 		for (size_t offset: swappableOffsets)
 			if (ops.sourceOffsetToDepth(offset) < _targetStats.args.size())
 			{
-				if (!ops.isArgsCompatible(offset, offset) && ops.isSourceCompatible(offset, _stack.size() - 1))
+				if (ops.offsetInTargetArgsRegion(offset) && !ops.isArgsCompatible(offset, offset))
 				{
 					_stack.swap(ops.sourceOffsetToDepth(offset));
 					return true;

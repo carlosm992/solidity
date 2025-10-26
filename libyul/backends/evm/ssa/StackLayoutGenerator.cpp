@@ -8,6 +8,7 @@
 #include "range/v3/algorithm/none_of.hpp"
 #include "range/v3/algorithm/replace.hpp"
 #include "range/v3/algorithm/sort.hpp"
+#include "range/v3/numeric/accumulate.hpp"
 #include "range/v3/numeric/iota.hpp"
 #include "range/v3/view/drop.hpp"
 
@@ -21,7 +22,7 @@ using namespace solidity::yul;
 using namespace solidity::yul::ssa;
 
 #if !defined(NDEBUG)
-bool StackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = false;
+bool StackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = true;
 #else
 bool StackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = false;
 #endif
@@ -29,7 +30,7 @@ bool StackLayoutGenerator::StackManipulationCallbacks::writeCallbackOutput = fal
 namespace
 {
 #if !defined(NDEBUG)
-bool constexpr debugOutput = false;
+bool constexpr debugOutput = true;
 #else
 bool constexpr debugOutput = false;
 #endif
@@ -354,7 +355,17 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		std::size_t const targetSize = [&]
 		{
 			int const minSize = static_cast<int>(liveOutWithoutOutputs.size() + requiredStackTop.size());
-			int const pivot = std::max(minSize, static_cast<int>(stack.size()));
+			boost::container::flat_map<Slot, size_t> deficit;
+			for (auto const& v: liveOutWithoutOutputs)
+				deficit[Slot::makeValueID(v)]++;
+			for (auto const& arg: requiredStackTop)
+				deficit[arg]++;
+			for (auto const& slot: stack)
+				if (auto it = deficit.find(slot); it != deficit.end())
+					it->second = it->second > 0 ? it->second - 1 : 0;
+
+			// todo this should be a better heuristic. on revert paths vs returning paths.
+			int const pivot = stack.size() + ranges::accumulate(deficit | ranges::views::values, 0);
 
 			std::size_t currentMinNumOps = std::numeric_limits<std::size_t>::max();
 
@@ -365,6 +376,10 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 			{
 				auto const tryTargetSize = pivot + delta;
 				if (tryTargetSize < 0 || tryTargetSize < minSize)
+					continue;
+
+				// todo remove later
+				if (tryTargetSize != pivot)
 					continue;
 
 				// copy the current data
@@ -397,7 +412,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		if constexpr(debugOutput)
 		{
 			#if !defined(NDEBUG)
-			StackManipulationCallbacks::writeCallbackOutput = false;
+			StackManipulationCallbacks::writeCallbackOutput = true;
 			#endif
 			fmt::print(" -> {}\n", stackToString(currentStackData, m_cfg));
 		}
