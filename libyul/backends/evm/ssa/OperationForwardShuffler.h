@@ -666,13 +666,18 @@ private:
 			!ops.requiredInArgs(_stack.top())  // not needed in args at all, can be swapped into tail
 		)
 		{
+			auto const tailEnd = std::min(_stack.begin() + _targetStats.tailSize, _stack.end());
 			for (size_t offset: ranges::views::iota(0u, _stack.size() - 1))
 				// It makes sense to swap to a lower position, if
 				if (
 					(!ops.offsetInTargetArgsRegion(offset) || !ops.isArgsCompatible(offset, offset)) && // The lower slot is not already in position.
 					!ops.isSourceCompatible(offset, _stack.size() - 1) && // We would not just swap identical slots.
 					ops.isArgsCompatible(offset, _stack.size() - 1) && // The lower position wants to be at the top
-					std::find(_stack.begin() + offset + 1, _stack.begin() + _targetStats.tailSize, _stack[offset]) == _stack.begin() + _targetStats.tailSize  // there is no same thing in the tail part further up the stack
+					std::find(
+						std::min(_stack.begin() + offset + 1, tailEnd),
+						tailEnd,
+						_stack[offset]
+					) == tailEnd  // there is no same thing in the tail part further up the stack
 				)
 				{
 					if (offset <= ReachableStackDepth)
@@ -707,15 +712,42 @@ private:
 				return true;
 			}
 
-			// the top is required in tail and already there, just pop it too
-			if (ops.requiredInTail(_stack.top()) && ops.stackStats.tailCount(_stack.top()) > 0)
+			if (ops.requiredInTail(_stack.top()))
 			{
-				_stack.pop();
-				return true;
-			}
+				// the top is required in tail and already there, just pop it too
+				if (ops.stackStats.tailCount(_stack.top()) > 0)
+				{
+					_stack.pop();
+					return true;
+				}
 
-			// todo the top is required in tail and not already there, bring it down by swapping something
-			//		up that wants to be in args or can be popped
+				// bring it down by swapping something up that wants to be in args or can be popped
+				for (size_t tailOffset: ranges::views::iota(0u, _targetStats.tailSize) | ranges::views::reverse)
+				{
+					if (ops.stackStats.argsCount(_stack[tailOffset]) < ops.targetArgsCount(_stack[tailOffset]))
+					{
+						if (ops.sourceOffsetToDepth(tailOffset) > ReachableStackDepth)
+						{
+							if (ops.compress())
+								return true;
+							// stack too deep
+						}
+
+						_stack.swap(ops.sourceOffsetToDepth(tailOffset));
+						return true;
+					}
+				}
+
+				for (size_t tailOffset: ranges::views::iota(0u, _targetStats.tailSize) | ranges::views::reverse)
+				{
+					if (ops.canBePopped(_stack[tailOffset]))
+					{
+						_stack.swap(ops.sourceOffsetToDepth(tailOffset));
+						_stack.pop();
+						return true;
+					}
+				}
+			}
 
 			// it is required in tail and not already there, try finding something that can be popped
 			for (size_t tailOffset: ranges::views::iota(0u, _targetStats.tailSize) | ranges::views::reverse)
