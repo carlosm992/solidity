@@ -504,6 +504,7 @@ private:
 				if (
 					ops.isArgsCompatible(_stack.size() - 1, argsOffset) &&  // top is compatible with args offset
 					!ops.isArgsCompatible(argsOffset, argsOffset) &&  // args offset is out of position
+					argsOffset < _stack.size() &&
 					ops.sourceOffsetToDepth(argsOffset) <= ReachableStackDepth  // reachable
 				)
 				{
@@ -517,6 +518,7 @@ private:
 				if (
 					!ops.isArgsCompatible(argsOffset, argsOffset) &&  // slot at args offset is out of position
 					!ops.isSourceCompatible(_stack.size() - 1, argsOffset) &&  // current top isnt compatible with that one
+					argsOffset < _stack.size() &&
 					ops.sourceOffsetToDepth(argsOffset) <= ReachableStackDepth  // reachable
 				)
 				{
