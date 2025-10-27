@@ -386,6 +386,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 				data = stack.data();
 				StackType countOpsStack (data, {});
 				OperationForwardShuffler<StackManipulationCallbacks>::shuffle(countOpsStack, requiredStackTop, opLiveOutWithoutOutputs, static_cast<std::size_t>(tryTargetSize), m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
+				yulAssert(countOpsStack.size() == tryTargetSize);
 				if (countOpsStack.callbacks().numOps < currentMinNumOps)
 				{
 					currentMinNumOps = countOpsStack.callbacks().numOps;

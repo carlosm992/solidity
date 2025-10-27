@@ -45,7 +45,7 @@ using namespace solidity::yul;
 using namespace solidity::yul::ssa;
 
 #if !defined(NDEBUG)
-bool constexpr debugOutput = false;
+bool constexpr debugOutput = true;
 #else
 bool constexpr debugOutput = false;
 #endif
@@ -143,6 +143,7 @@ SSACFGEVMCodeTransform::SSACFGEVMCodeTransform
 	m_assembly(_assembly),
 	m_builtinContext(_builtinContext),
 	m_cfg(_cfg),
+	m_liveness(_liveness),
 	m_junkBlockFinder(_cfg, _liveness.topologicalSort()),
 	m_stackLayout(StackLayoutGenerator::generate(_liveness, m_junkBlockFinder)),
 	m_assemblyCallbacks{
@@ -192,6 +193,7 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 	yulAssert(m_cfg.block(_block).operations.size() == blockLayout.operationIn.size(), "We need as many stack layouts as we have operations");
 
 	// for each op with respective live-out, descend into op
+	size_t operationIndex = 0;
 	for (auto const& [operation, operationStackIn]: ranges::views::zip( m_cfg.block(_block).operations, blockLayout.operationIn))
 	{
 		bool const hasReturnLabel = std::holds_alternative<SSACFG::Call>(operation.kind)
@@ -212,22 +214,25 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			}, operation.kind);
 			std::cout << "\t\t" << operationName << ": " << stackToString(m_stack.data(), m_cfg) << " -> " << stackToString(operationStackIn, m_cfg) << std::endl;
 		}
-		if (false)
+		if (true)
 		{
 			std::vector<Slot> requiredStackTop;
 			if (auto const* call = std::get_if<SSACFG::Call>(&operation.kind))
 				if (call->canContinue)
 				{
-					auto callSiteID = m_stackLayout.callSites.callSiteID(&call->call.get());
-					yulAssert(callSiteID);
+					auto const callSiteID = m_stackLayout.callSites.callSiteID(&call->call.get());
+					yulAssert(callSiteID.has_value());
 					requiredStackTop.emplace_back(Slot::makeFunctionCallReturnLabel(*callSiteID));
 				}
+			requiredStackTop += operation.inputs | ranges::views::transform(Slot::makeValueID);
 			LivenessAnalysis::LivenessData opLiveOut = m_liveness.operationsLiveOut(_block)[operationIndex];
 			auto opLiveOutWithoutOutputs = opLiveOut;
 			for (auto const& output: operation.outputs)
 				opLiveOutWithoutOutputs.erase(output);
-			requiredStackTop += operation.inputs;
-			OperationForwardShuffler<SSACFGStack>::shuffle(m_stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_block));
+			for (size_t depth = 0; depth < m_stack.size(); ++depth)
+				if (m_stack.slot(depth).isValueID() && !opLiveOutWithoutOutputs.contains(m_stack.slot(depth).valueID()) && ranges::find(requiredStackTop, m_stack.slot(depth)) == ranges::end(requiredStackTop))
+					m_stack.declareJunk(depth);
+			OperationForwardShuffler<AssemblyCallbacks>::shuffle(m_stack, requiredStackTop, opLiveOutWithoutOutputs, operationStackIn.size(), m_junkBlockFinder.blockAllowsAdditionOfJunk(_block));
 		}
 		else
 			DanielShuffler<Stack<AssemblyCallbacks>>::shuffle(m_stack, {}, operationStackIn);
@@ -268,6 +273,8 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			static_cast<int>(m_stack.size()) == m_assembly.stackHeight(),
 			fmt::format("symbolic stack size = {} =/= {} = assembly stack height", m_stack.size(), m_assembly.stackHeight())
 		);
+
+		++operationIndex;
 	}
 
 	shuffleStack(m_stackLayout[_block].stackOut);

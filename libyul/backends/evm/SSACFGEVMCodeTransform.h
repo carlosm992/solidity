@@ -151,6 +151,7 @@ private:
 	BuiltinContext& m_builtinContext;
 	// ControlFlow const& m_controlFlow;
 	SSACFG const& m_cfg;
+	LivenessAnalysis const& m_liveness;
 	TerminationPathAnalysis m_junkBlockFinder;
 	SSACFGStackLayout const m_stackLayout;
 	std::vector<StackTooDeepError> m_stackErrors;
