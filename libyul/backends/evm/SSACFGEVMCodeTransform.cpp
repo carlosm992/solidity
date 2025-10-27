@@ -212,13 +212,15 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			}, operation.kind);
 			std::cout << "\t\t" << operationName << ": " << stackToString(m_stack.data(), m_cfg) << " -> " << stackToString(operationStackIn, m_cfg) << std::endl;
 		}
-		/*if (false)
+		if (false)
 		{
 			std::vector<Slot> requiredStackTop;
 			if (auto const* call = std::get_if<SSACFG::Call>(&operation.kind))
 				if (call->canContinue)
 				{
-					requiredStackTop.emplace_back(FunctionReturnLabel{&call->call.get()});
+					auto callSiteID = m_stackLayout.callSites.callSiteID(&call->call.get());
+					yulAssert(callSiteID);
+					requiredStackTop.emplace_back(Slot::makeFunctionCallReturnLabel(*callSiteID));
 				}
 			LivenessAnalysis::LivenessData opLiveOut = m_liveness.operationsLiveOut(_block)[operationIndex];
 			auto opLiveOutWithoutOutputs = opLiveOut;
@@ -227,8 +229,8 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			requiredStackTop += operation.inputs;
 			OperationForwardShuffler<SSACFGStack>::shuffle(m_stack, requiredStackTop, opLiveOutWithoutOutputs, m_junkBlockFinder.blockAllowsAdditionOfJunk(_block));
 		}
-		else*/
-		DanielShuffler<Stack<AssemblyCallbacks>>::shuffle(m_stack, {}, operationStackIn);
+		else
+			DanielShuffler<Stack<AssemblyCallbacks>>::shuffle(m_stack, {}, operationStackIn);
 
 		// Assert that we have the inputs of the operation on stack top.
 		yulAssert(m_stack.size() >= operation.inputs.size() + (hasReturnLabel ? 1 : 0));
