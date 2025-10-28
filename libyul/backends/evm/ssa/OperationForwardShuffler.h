@@ -198,13 +198,15 @@ private:
 			return targetStats.targetSize - _offset - 1;
 		}
 
-		bool compress()
+		bool compress(bool _canPopTop = false)
 		{
 			// from deep to shallow check if something can be popped, then pop it
-			for (size_t depth: ranges::views::iota(1u, ReachableStackDepth + 1u) | ranges::views::reverse)
+			auto const depthRange = ranges::views::iota(_canPopTop ? 0u : 1u, ReachableStackDepth + 1u);
+			for (size_t depth: depthRange | ranges::views::reverse)
 				if (depth < stack.size() && canBePopped(stack.slot(depth)))
 				{
-					stack.swap(depth);
+					if (depth > 0)
+						stack.swap(depth);
 					stack.pop();
 					return true;
 				}
@@ -376,7 +378,7 @@ private:
 			!_stack.empty() &&  // stack can't be empty if we want to pop things
 			ops.stackStats.totalCount(_stack.top()) > ops.targetMinCount(_stack.top()) &&  // there's too much of the top
 			!ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) &&  // it's not compatible with its current offset
-			_stack.size() < ops.targetStats.targetSize && // todo we might not want to pop this if we need to reach a higher stack size either ?
+			_stack.size() > ops.targetStats.targetSize && // todo we might not want to pop this if we need to reach a higher stack size either ?
 			!_stack.top().isJunk())  // it's not junk (we might want to swap this later)
 		{
 			_stack.pop();
@@ -423,6 +425,7 @@ private:
 					_stack.pushOrDup(arg);
 					return true;
 				}
+				return true;
 			}
 		}
 
@@ -466,8 +469,12 @@ private:
 			}*/
 
 			// if we can introduce junk and we're not overshooting the target size, just try to dup it up
-			if (_generateJunk && _stack.size() < _targetStats.targetSize && dupDeepSlotIfRequired(ops, _generateJunk))
-				_stack.pushOrDup(_targetStats.args.back());
+			if (_generateJunk && _stack.size() < _targetStats.targetSize)
+			{
+				if (!dupDeepSlotIfRequired(ops, _generateJunk))
+					_stack.pushOrDup(_targetStats.args.back());
+				return true;
+			}
 
 			// if we need more of whatever goes to the top, and it's reachable, just dup it
 			if (ops.targetMinCount(_targetStats.args.back()) > ops.stackStats.totalCount(_targetStats.args.back()))
@@ -486,7 +493,7 @@ private:
 					ops.isArgsCompatible(_stack.size() - 1, offset) &&  // top also fixes slot at offset
 					!ops.isArgsCompatible(offset, offset))  // offset slot isn't in the right position already
 				{
-					_stack.swap(_stack.size() - offset - 1);
+					_stack.swap(ops.sourceOffsetToDepth(offset));
 					return true;
 				}
 
@@ -514,20 +521,29 @@ private:
 			}
 
 			// take the deepest args target slot that doesn’t hold an identical value and isn't in position
+			bool haveOutOfPositionSlot = false;
 			for (size_t argsOffset = ops.targetStats.targetSize - ops.targetStats.args.size(); argsOffset < ops.targetStats.targetSize; ++argsOffset)
 				if (
 					!ops.isArgsCompatible(argsOffset, argsOffset) &&  // slot at args offset is out of position
-					!ops.isSourceCompatible(_stack.size() - 1, argsOffset) &&  // current top isnt compatible with that one
-					argsOffset < _stack.size() &&
-					ops.sourceOffsetToDepth(argsOffset) <= ReachableStackDepth  // reachable
+					!ops.isSourceCompatible(_stack.size() - 1, argsOffset) &&  // current top isn't compatible with that one
+					argsOffset < _stack.size()
 				)
 				{
-					_stack.swap(ops.sourceOffsetToDepth(argsOffset));
-					return true;
+					// check that there is a compatible slot somewhere on the stack that isn't already finalized
+					for (size_t stackArgOffset = _targetStats.tailSize; stackArgOffset < _stack.size(); ++stackArgOffset)
+						if (ops.isArgsCompatible(argsOffset, stackArgOffset) && !ops.isArgsCompatible(stackArgOffset, stackArgOffset))
+						{
+							haveOutOfPositionSlot = true;
+							if (ops.sourceOffsetToDepth(argsOffset) <= ReachableStackDepth)
+							{
+								_stack.swap(ops.sourceOffsetToDepth(argsOffset));
+								return true;
+							}
+						}
 				}
 
 			// we can’t swap that deep, park current slot in a reachable slot that can be removed (too many of it or junk) and pop the head afterwards
-			if (ops.compress())
+			if (haveOutOfPositionSlot && ops.compress())
 				return true;
 
 			// todo unnecessary?
@@ -547,14 +563,12 @@ private:
 					_stack.pop();
 					return true;
 				}*/
-
-			yulAssert(false, fmt::format("stack too deep: {}", stackToString(_stack.data())));
 		}
 
 		// if we're still too large, there should be something we can dispose of
 		if (_stack.size() > _targetStats.targetSize)
 		{
-			if (ops.compress())
+			if (ops.compress(true))
 				return true;
 
 			yulAssert("Couldn't reach target size.");
@@ -564,12 +578,12 @@ private:
 		// we already popped it, and if it is required in args, we already swapped it down to a suitable target position.
 		yulAssert(_stack.size() <= _targetStats.targetSize, fmt::format("oops: {}, {}", _targetStats.targetSize, stackToString(_stack.data())));
 
-		yulAssert(
+		/*yulAssert(
 			_stack.empty() ||  // stack can be empty
 			_stack.top().isJunk() ||  // top may be junk
 			ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) ||  // top is in position (?) todo dont think this is true anymore, we might be smaller
 			ops.requiredInTail(_stack.top()) // top needs to go to tail (perhaps also into args)
-		);
+		);*/
 
 		// if the stack is so small that it's not reaching into the args region, try to dup something up that either fixes
 		// the top (in the case of size is just below args) or just dup the deepest elem
@@ -645,11 +659,13 @@ private:
 
 					// stack too deep
 					_stack.dup(_stack[offset]);
+					return true;
 				}
 			}
 
 			// push junk, didnt find anything suitable
 			_stack.push(Stack<Callback>::Slot::makeJunk());
+			return true;
 		}
 
 		// we have filled the stack so it reaches into the args region
@@ -794,7 +810,15 @@ private:
 			yulAssert(false, "the top is not required in args but required in tail but we can't pop _anything_ in tail, this shouldn't be possible.");
 		}
 
-		yulAssert(_stack.empty() || ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) || ops.requiredInTail(_stack.top()) || _stack.top().isJunk(), fmt::format("Current stack: {}", stackToString(_stack.data())));
+		yulAssert(
+			(
+				_stack.empty() ||
+				ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) ||
+				ops.requiredInArgs(_stack.top()) ||
+				_stack.top().isJunk()
+			),
+			fmt::format("Current stack: {}", stackToString(_stack.data()))
+		);
 
 		// if we haven't matched the target size, try to dup things into their right position
 		if (_stack.size() < _targetStats.targetSize)
@@ -809,11 +833,14 @@ private:
 		// if there is any slot we need more of to populate args, dup that, next step
 		for (auto const& arg: ops.targetStats.args)
 			if (ops.targetMinCount(arg) > ops.stackStats.totalCount(arg))
+			{
 				if (!dupDeepSlotIfRequired(ops, _generateJunk))
 				{
 					_stack.pushOrDup(arg);
 					return true;
 				}
+				return true;
+			}
 
 		// now all required slots are present in required quantity
 		for (auto const& [targetSlot, targetSlotMinCount]: ops.targetStats.targetMinCounts)

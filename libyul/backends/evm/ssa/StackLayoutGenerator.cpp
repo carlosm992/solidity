@@ -378,10 +378,6 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 				if (tryTargetSize < 0 || tryTargetSize < minSize)
 					continue;
 
-				// todo remove later
-				if (tryTargetSize != pivot)
-					continue;
-
 				// copy the current data
 				data = stack.data();
 				StackType countOpsStack (data, {});
