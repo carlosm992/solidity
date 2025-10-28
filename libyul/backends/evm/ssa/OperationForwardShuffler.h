@@ -159,7 +159,8 @@ private:
 
 		bool canBePopped(Slot const& _slot) const
 		{
-			return stackStats.totalCount(_slot) > targetMinCount(_slot); // todo  || stack.canBeFreelyGenerated(_slot)?
+			bool enoughQuantity = stackStats.totalCount(_slot) > targetMinCount(_slot);
+			return (!requiredInArgs(_slot) && enoughQuantity) || (requiredInArgs(_slot) && stackStats.reachableCount(_slot) > 0); // todo  || stack.canBeFreelyGenerated(_slot)?
 		}
 
 		bool offsetInTargetArgsRegion(size_t _offset) const
@@ -198,7 +199,7 @@ private:
 			return targetStats.targetSize - _offset - 1;
 		}
 
-		bool compress(bool _canPopTop = false)
+		bool compress(bool _canPopTop = false) const
 		{
 			// from deep to shallow check if something can be popped, then pop it
 			auto const depthRange = ranges::views::iota(_canPopTop ? 0u : 1u, ReachableStackDepth + 1u);
@@ -285,35 +286,9 @@ private:
 				{
 					// the slot we need something in the args region of is unreachable, try compressing the stack,
 					// first looking at the top
-					if (_ops.canBePopped(_ops.stack.top()) || _ops.stack.top().isJunk())
-					{
-						_ops.stack.pop();
+					if (_ops.compress(true))
 						return true;
-					}
-					for (size_t depth = 1; depth < std::min(_ops.stack.size(), ReachableStackDepth); ++depth)
-						// junk is prioritized
-						if (_ops.stack.slot(depth).isJunk())
-						{
-							_ops.stack.swap(depth);
-							_ops.stack.pop();
-							return true;
-						}
-					for (size_t depth = 1; depth < std::min(_ops.stack.size(), ReachableStackDepth); ++depth)
-						// then check if we have too much of a variable
-						if (_ops.canBePopped(_ops.stack.slot(depth)))
-						{
-							_ops.stack.swap(depth);
-							_ops.stack.pop();
-							return true;
-						}
-					for (size_t depth = 1; depth < std::min(_ops.stack.size(), ReachableStackDepth); ++depth)
-						// worst case try popping literals and/or other stuff (return labels etc)
-						if (_ops.stack.canBeFreelyGenerated(_ops.stack.slot(depth)))
-						{
-							_ops.stack.swap(depth);
-							_ops.stack.pop();
-							return true;
-						}
+
 					// todo stack too deep of `slot`. :(
 					return false;
 				}
@@ -374,16 +349,16 @@ private:
 		yulAssert(_targetStats.targetSize > 0, "Direct consequence from args not being empty");
 
 		// If we no longer need the current stack top, we pop it
-		if (
+		/*if (
 			!_stack.empty() &&  // stack can't be empty if we want to pop things
-			ops.stackStats.totalCount(_stack.top()) > ops.targetMinCount(_stack.top()) &&  // there's too much of the top
+			ops.stackStats.totalCount(_stack.top()) > ops.targetMinCount(_stack.top()) &&  // there's potentially too much of the top
 			!ops.isArgsCompatible(_stack.size() - 1, _stack.size() - 1) &&  // it's not compatible with its current offset
-			_stack.size() > ops.targetStats.targetSize && // todo we might not want to pop this if we need to reach a higher stack size either ?
+			_stack.size() > ops.targetStats.targetSize &&
 			!_stack.top().isJunk())  // it's not junk (we might want to swap this later)
 		{
 			_stack.pop();
 			return true;
-		}
+		}*/
 
 		// the top is either required in args or in tail or is junk or the stack is empty
 		yulAssert(
@@ -866,7 +841,11 @@ private:
 		for (size_t offset: swappableOffsets)
 			if (ops.sourceOffsetToDepth(offset) < _targetStats.args.size())
 			{
-				if (ops.offsetInTargetArgsRegion(offset) && !ops.isArgsCompatible(offset, offset))
+				if (
+					ops.offsetInTargetArgsRegion(offset) &&
+					!ops.isArgsCompatible(offset, offset) &&
+					!ops.isSourceCompatible(offset, _stack.size() - 1)
+				)
 				{
 					_stack.swap(ops.sourceOffsetToDepth(offset));
 					return true;
@@ -874,7 +853,11 @@ private:
 			}
 			else
 			{
-				if (ops.requiredInArgs(_stack[offset]) && ops.stackStats.argsCount(_stack[offset]) < ops.targetArgsCount(_stack[offset]))
+				if (
+					ops.requiredInArgs(_stack[offset]) &&
+					ops.stackStats.argsCount(_stack[offset]) < ops.targetArgsCount(_stack[offset]) &&
+					!ops.isSourceCompatible(offset, _stack.size() - 1)
+				)
 				{
 					_stack.swap(ops.sourceOffsetToDepth(offset));
 					return true;
