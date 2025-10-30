@@ -299,7 +299,7 @@ private:
 
 	static auto stackArgsRange(Stack<Callback> const& _stack, std::size_t const _tailSize)
 	{
-		return ranges::views::iota(_tailSize, _stack.size()) | ranges::views::transform([](auto _i) { return StackOffset{_i}; });
+		return ranges::views::iota(std::min(_tailSize, _stack.size()), _stack.size()) | ranges::views::transform([](auto _i) { return StackOffset{_i}; });
 	}
 
 	static auto stackTailRange(Stack<Callback> const& _stack, std::size_t const _tailSize)
@@ -409,6 +409,7 @@ private:
 		// check that args are either in position or reachable
 		for (StackOffset offset{_ops.targetStats.tailSize}; offset < _ops.targetStats.targetSize; ++offset.value)
 			if (
+				offset < _ops.stack.size() &&
 				!_ops.isArgsCompatible(offset, offset) &&  // the slot isn't in place
 				!_ops.stack.canBeFreelyGenerated(_ops.targetArg(offset))  // we can't just push it
 			)
@@ -571,7 +572,8 @@ private:
 				if (
 					offset != stackTop &&
 					_ops.stack.swapReachable(offset) &&
-					_ops.isArgsCompatible(stackTop, offset)
+					!_ops.isArgsCompatible(offset, offset) &&
+					_ops.isArgsCompatible(offset, stackTop)
 				)
 				{
 					_ops.stack.swap(offset);
@@ -675,14 +677,19 @@ private:
 				return true;
 			{
 				StackOffset const targetOffset{_stack.size()};
-				auto const sourceDepth = _stack.findSlotDepth(ops.targetArg(targetOffset));
-				if (!sourceDepth)
-					_stack.push(ops.targetArg(targetOffset));
-				else
+				if (ops.stackStats.totalCount(ops.targetArg(targetOffset)) < ops.targetMinCount(ops.targetArg(targetOffset)))
 				{
+					auto const sourceDepth = _stack.findSlotDepth(ops.targetArg(targetOffset));
+					if (!sourceDepth)
+					{
+						_stack.push(ops.targetArg(targetOffset));
+						return true;
+					}
+
 					if (!_stack.dupReachable(*sourceDepth))
 						yulAssert(false, fmt::format("todo: stack too deep handling, couldn't dup up arg {}", slotToString(ops.targetArg(_stack.depthToOffset(*sourceDepth)))));
 					_stack.dup(*sourceDepth);
+					return true;
 				}
 			}
 
@@ -690,7 +697,7 @@ private:
 			for (StackOffset offset{ops.targetStats.tailSize}; offset < ops.targetStats.targetSize; ++offset.value)
 			{
 				Slot const& arg = ops.targetArg(offset);
-				if (ops.stackStats.argsCount(arg) < ops.targetArgsCount(arg))
+				if (ops.stackStats.totalCount(arg) < ops.targetMinCount(arg))
 				{
 					if (auto sourceDepth = ops.stack.findSlotDepth(arg))
 					{
