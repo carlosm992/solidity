@@ -612,6 +612,7 @@ private:
 		if (_stack.size() > _targetStats.targetSize)
 		{
 			yulAssert(shrinkStack(_stack, ops), "Couldn't shrink stack to target size");
+			return true;
 			// todo: in the future we'll want stack too deep handling here and
 			//		 dup up the args if possible or mload them by explicitly calling _stack.reportStackTooDeep(arg)
 		}
