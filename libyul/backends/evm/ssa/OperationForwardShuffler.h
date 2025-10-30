@@ -197,7 +197,7 @@ private:
 			return arg.isJunk() || stack[_sourceOffset] == arg;
 		}
 
-		bool isSourceCompatible(size_t _sourceOffset1, size_t _sourceOffset2) const
+		bool isSourceCompatible(StackOffset const& _sourceOffset1, StackOffset const& _sourceOffset2) const
 		{
 			return _sourceOffset1 < stack.size() && _sourceOffset2 < stack.size() && stack[_sourceOffset1] == stack[_sourceOffset2];
 		}
@@ -660,14 +660,77 @@ private:
 		}
 
 		// of the existing args, can we improve the situation?
+		// it can't happen that the tail needs stuff at this point as we already have admissibility in the
+		// tail distribution
 		if (fixArgsSlot(ops))
 			return true;
 
 		// dup up whatever is missing
 		if (_stack.size() < _targetStats.targetSize)
 		{
-
+			if (dupDeepSlotIfRequired(ops, _generateJunk))
+				return true;
+			StackOffset const targetOffset{_stack.size()};
+			auto const sourceDepth = _stack.findSlotDepth(ops.targetArg(targetOffset));
+			if (!sourceDepth)
+				_stack.push(ops.targetArg(targetOffset));
+			else
+			{
+				if (!_stack.dupReachable(*sourceDepth))
+					yulAssert(false, fmt::format("todo: stack too deep handling, couldn't dup up arg {}", slotToString(ops.targetArg(_stack.depthToOffset(*sourceDepth)))));
+				_stack.dup(*sourceDepth);
+			}
+			return true;
 		}
+
+		yulAssert(_stack.size() == _targetStats.targetSize);
+
+		// If we find a lower slot that is out of position, but also compatible with the top, swap that up.
+		StackOffset stackTopOffset{_stack.size() - 1};
+		for (StackOffset const offset: stackSwapReachableRange(_stack))
+			if (
+				!ops.isArgsCompatible(offset, offset) &&
+				!ops.isSourceCompatible(offset, stackTopOffset) &&
+				ops.isArgsCompatible(offset, stackTopOffset)
+			)
+			{
+				_stack.swap(offset);
+				return true;
+			}
+
+		// Swap up any reachable slot that is still out of position.
+		for (StackOffset const offset: stackSwapReachableRange(_stack))
+			if (_stack.offsetToDepth(offset) < _targetStats.args.size())
+			{
+				if (
+					ops.offsetInTargetArgsRegion(offset) &&
+					!ops.isArgsCompatible(offset, offset) &&
+					!ops.isSourceCompatible(offset, stackTopOffset)
+				)
+				{
+					_stack.swap(offset);
+					return true;
+				}
+			}
+			else
+			{
+				if (
+					ops.requiredInArgs(_stack[offset]) &&
+					ops.stackStats.argsCount(_stack[offset]) < ops.targetArgsCount(_stack[offset]) &&
+					!ops.isSourceCompatible(offset, stackTopOffset)
+				)
+				{
+					_stack.swap(offset);
+					return true;
+				}
+			}
+
+		if (ops.stackAdmissible())
+			return false;
+
+		// We are in a stack-too-deep situation and try to reduce the stack size.
+		if (shrinkStack(_stack, ops))
+			return true;
 
 		yulAssert(false, "reached final and forbidden state");
 	}
