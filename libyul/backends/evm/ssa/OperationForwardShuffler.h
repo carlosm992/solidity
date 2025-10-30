@@ -309,17 +309,12 @@ private:
 
 	static auto stackRange(Stack<Callback> const& _stack)
 	{
-		return ranges::views::iota(0u, _stack.size()) | ranges::views::transform([&](auto _i) { return _stack.depthToOffset(StackDepth{_i}); });
+		return ranges::views::iota(0u, _stack.size()) | ranges::views::transform([&](auto _i) { return StackOffset{_i}; });
 	}
 
 	static auto stackSwapReachableRange(Stack<Callback> const& _stack)
 	{
-		return ranges::views::iota(0u, std::min(_stack.size(), ReachableStackDepth + 1)) | ranges::views::transform([&](auto _i) { return _stack.depthToOffset(StackDepth{_i}); });
-	}
-
-	static auto stackDupReachableRange(Stack<Callback> const& _stack)
-	{
-		return ranges::views::iota(0u, std::min(_stack.size(), ReachableStackDepth)) | ranges::views::transform([&](auto _i) { return _stack.depthToOffset(StackDepth{_i}); });
+		return ranges::views::iota(0u, std::min(_stack.size(), ReachableStackDepth + 1)) | ranges::views::transform([&](auto _i) { return _stack.depthToOffset(StackDepth{_i}); }) | ranges::views::reverse;
 	}
 
 	static bool shrinkStack(Stack<Callback>& _stack, Ops const& _ops)
@@ -718,8 +713,13 @@ private:
 
 		yulAssert(_stack.size() == _targetStats.targetSize);
 
-		// If we find a lower slot that is out of position, but also compatible with the top, swap that up.
 		StackOffset stackTopOffset{_stack.size() - 1};
+
+		// try fix something
+		//if (fixArgsSlot(ops))
+		//	return true;
+
+		// If we find a lower slot that is out of position, but also compatible with the top, swap that up.
 		for (StackOffset const offset: stackSwapReachableRange(_stack))
 			if (
 				!ops.isArgsCompatible(offset, offset) &&
