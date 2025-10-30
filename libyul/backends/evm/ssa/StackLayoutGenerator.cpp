@@ -57,7 +57,7 @@ private:
 
 void declareJunk(StackLayoutGenerator::StackType& _stack, LivenessAnalysis::LivenessData const& _live)
 {
-	for (size_t depth = 0; depth < _stack.size(); ++depth)
+	for (StackLayoutGenerator::StackType::Depth depth{0}; depth < _stack.size(); ++depth.value)
 	{
 		auto const slot = _stack.slot(depth);
 		if (slot.isValueID() && !_live.contains(slot.valueID()))
@@ -343,7 +343,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 			}
 		requiredStackTop += operation.inputs | ranges::views::transform(Slot::makeValueID);
 
-		for (size_t depth = 0; depth < stack.size(); ++depth)
+		for (StackType::Depth depth{0}; depth < stack.size(); ++depth.value)
 			if (stack.slot(depth).isValueID() && !liveOutWithoutOutputsSet.contains(stack.slot(depth).valueID()) && ranges::find(requiredStackTop, stack.slot(depth)) == ranges::end(requiredStackTop))
 				stack.declareJunk(depth);
 		/*junkShuffler(stack);*/
@@ -380,7 +380,8 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 
 				if (pivot != tryTargetSize)
 					continue;
-
+				if constexpr(debugOutput)
+					std::cout << "\n\t\t\t -> target size = " << tryTargetSize << ": ";
 				// copy the current data
 				data = stack.data();
 				StackType countOpsStack (data, {});
@@ -391,10 +392,22 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 					currentMinNumOps = countOpsStack.callbacks().numOps;
 					result = static_cast<std::size_t>(tryTargetSize);
 				}
+				std::cout << std::endl;
 			}
 			return result;
 		}();
+		if constexpr(debugOutput)
+			std::cout<<"\t\t\t -> ";
 		OperationForwardShuffler<StackManipulationCallbacks>::shuffle(stack, requiredStackTop, opLiveOutWithoutOutputs, targetSize, m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId));
+		if constexpr(debugOutput)
+		{
+			std::string const operationName = std::visit(util::GenericVisitor{
+				[](SSACFG::Call const& _call) { return _call.function.get().name.str(); },
+				[](SSACFG::BuiltinCall const& _call) { return _call.builtin.get().name; },
+				[](SSACFG::LiteralAssignment const&) -> std::string { return "assign"; }
+			}, operation.kind);
+			std::cout << fmt::format("\n\t\t\t -> {}({}) ", operationName, stackToString(stack.data()));
+		}
 
 		m_stackLayout[_blockId].operationIn.push_back(currentStackData);
 
@@ -448,7 +461,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 			else
 			{
 				// can swap up
-				if (auto const depth = stack.slotDepth(Slot::makeValueID(cjump->condition)))
+				if (auto depth = stack.findSlotDepth(Slot::makeValueID(cjump->condition)))
 					stack.swap(*depth);
 				else
 					stack.push(Slot::makeValueID(cjump->condition));
