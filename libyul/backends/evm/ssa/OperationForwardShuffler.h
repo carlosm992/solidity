@@ -455,7 +455,7 @@ private:
 						_ops.stack.swapReachable(tailOffset) &&  // we can swap that deep
 						(!_ops.requiredInTail(_ops.stack[tailOffset]) || _ops.stackStats.tailCount(_ops.stack[tailOffset]) > 1) &&  // dont need it in tail or it's available more than once
 						_ops.requiredInArgs(_ops.stack[tailOffset]) &&  // we need the tail offset slot in args
-						_ops.targetArgsCount(_ops.stack[tailOffset]) > _ops.stackStats.argsCount(_ops.stack[offset])  // we don't already have enough of it in args
+						_ops.targetArgsCount(_ops.stack[tailOffset]) > _ops.stackStats.argsCount(_ops.stack[tailOffset])  // we don't already have enough of it in args
 					)
 					{
 						// bring up offset slot if necessary
@@ -523,6 +523,7 @@ private:
 					return true;
 
 				// todo stack too deep handling, the slot at offset is required in args but we can't reach it
+				yulAssert(false);
 			}
 		}
 		return false;
@@ -630,6 +631,7 @@ private:
 				return true;
 			// todo: in the future we'll want stack too deep handling here and
 			//		 dup up the args if possible or mload them by explicitly calling _stack.reportStackTooDeep(arg)
+			yulAssert(_stack.size() < _targetStats.targetSize);
 		}
 
 		if (_stack.size() < _targetStats.tailSize)
@@ -670,15 +672,38 @@ private:
 		{
 			if (dupDeepSlotIfRequired(ops, _generateJunk))
 				return true;
-			StackOffset const targetOffset{_stack.size()};
-			auto const sourceDepth = _stack.findSlotDepth(ops.targetArg(targetOffset));
-			if (!sourceDepth)
-				_stack.push(ops.targetArg(targetOffset));
-			else
 			{
-				if (!_stack.dupReachable(*sourceDepth))
-					yulAssert(false, fmt::format("todo: stack too deep handling, couldn't dup up arg {}", slotToString(ops.targetArg(_stack.depthToOffset(*sourceDepth)))));
-				_stack.dup(*sourceDepth);
+				StackOffset const targetOffset{_stack.size()};
+				auto const sourceDepth = _stack.findSlotDepth(ops.targetArg(targetOffset));
+				if (!sourceDepth)
+					_stack.push(ops.targetArg(targetOffset));
+				else
+				{
+					if (!_stack.dupReachable(*sourceDepth))
+						yulAssert(false, fmt::format("todo: stack too deep handling, couldn't dup up arg {}", slotToString(ops.targetArg(_stack.depthToOffset(*sourceDepth)))));
+					_stack.dup(*sourceDepth);
+				}
+			}
+
+			// if we can't directly produce targetOffset, take the deepest arg that we don't have enough of and dup/push that
+			for (StackOffset offset{ops.targetStats.tailSize}; offset < ops.targetStats.targetSize; ++offset.value)
+			{
+				Slot const& arg = ops.targetArg(offset);
+				if (ops.stackStats.argsCount(arg) < ops.targetArgsCount(arg))
+				{
+					if (auto sourceDepth = ops.stack.findSlotDepth(arg))
+					{
+						if (ops.stack.dupReachable(*sourceDepth))
+						{
+							ops.stack.dup(*sourceDepth);
+							return true;
+						}
+						yulAssert(false, "stack too deep handling");
+					}
+					yulAssert(_stack.canBeFreelyGenerated(arg));
+					_stack.push(arg);
+					return true;
+				}
 			}
 			return true;
 		}
