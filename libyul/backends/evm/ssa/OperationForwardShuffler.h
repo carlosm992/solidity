@@ -216,21 +216,6 @@ private:
 			return stack.size() - _offset - 1;
 		}
 
-		bool compress(bool _canPopTop = false) const
-		{
-			// from deep to shallow check if something can be popped, then pop it
-			auto const depthRange = ranges::views::iota(_canPopTop ? 0u : 1u, ReachableStackDepth);
-			for (size_t depth: depthRange | ranges::views::reverse)
-				if (depth < stack.size() && canBePopped(stack.slot(depth)))
-				{
-					if (depth > 0)
-						stack.swap(depth);
-					stack.pop();
-					return true;
-				}
-			return false;
-		}
-
 		StackStats stackStats;
 		Stack<Callback>& stack;
 		TargetStats const& targetStats;
@@ -245,11 +230,10 @@ private:
 		if (_ops.stack.size() < ReachableStackDepth - 1)
 			return false;
 		// Check whether any deep slot might still be needed later (i.e. we still need to reach it with a DUP or SWAP).
-		for (size_t const sourceOffset: ranges::views::iota(0u, _ops.stack.size() - (ReachableStackDepth - 1)))
+		for (StackOffset sourceOffset{0u}; sourceOffset < _ops.stack.size() - (ReachableStackDepth - 1); ++sourceOffset.value)
 		{
-			auto const sourceDepth = _ops.stack.size() - sourceOffset - 1;
 			// This slot needs to be moved into args and there is no tail slot of the same kind further up in the stack.
-			auto const& slot = _ops.stack.slot(sourceDepth);
+			auto const& slot = _ops.stack.slot(sourceOffset);
 			// check if we have more of the same slot further up in the stack
 			bool const neededInArgs = _ops.targetArgsCount(slot) > _ops.stackStats.argsCount(slot);
 			bool const needMore = _ops.targetMinCount(slot) > _ops.stackStats.totalCount(slot);
@@ -261,10 +245,10 @@ private:
 
 				auto const [haveMoreAboveWithoutArgs, haveMoreAbove] = [&]
 				{
-					for (size_t offset = sourceOffset + 1; offset < _ops.stack.size(); ++offset)
+					for (StackOffset offset{sourceOffset.value + 1}; offset < _ops.stack.size(); ++offset.value)
 					{
 						if (_ops.stack[offset] == slot)
-							return std::make_tuple(_ops.stack.size() - offset - 1 >= _ops.targetStats.args.size(), true);
+							return std::make_tuple(_ops.stack.size() - offset.value - 1 >= _ops.targetStats.args.size(), true);
 					}
 					return std::make_tuple(false, false);
 				}();
@@ -278,8 +262,7 @@ private:
 				if ((neededInArgs && haveMoreAboveWithoutArgs) || (_generateJunk && haveMoreAbove))
 					continue;
 
-				bool const reachable = sourceDepth < ReachableStackDepth;
-				if (reachable)
+				if (_ops.stack.dupReachable(sourceOffset))
 				{
 					if (
 						!_ops.isArgsCompatible(sourceOffset, sourceOffset) &&  // the offset isn't already in the right position wrt args
@@ -290,7 +273,7 @@ private:
 					)
 					{
 						// top can go into the tail bit, swap it down
-						_ops.stack.swap(sourceDepth);
+						_ops.stack.swap(sourceOffset);
 					}
 					else
 					{
@@ -303,7 +286,7 @@ private:
 				{
 					// the slot we need something in the args region of is unreachable, try compressing the stack,
 					// first looking at the top
-					if (_ops.compress(true))
+					if (shrinkStack(_ops.stack, _ops))
 						return true;
 
 					// todo stack too deep of `slot`. :(
@@ -515,6 +498,36 @@ private:
 		return false;
 	}
 
+	static bool dupDeepestRelevantTailSlot(Ops& _ops)
+	{
+		auto& stack = _ops.stack;
+
+		// dup up the deepest slot that is required in args (or compress if unreachable)
+		for (StackOffset offset: stackRange(_ops.stack))
+		{
+			// if we need the slot in args and there's no slot of the same kind further up
+			if (
+				_ops.requiredInArgs(_ops.stack[offset]) &&
+				std::find(_ops.stack.begin() + offset.value + 1, _ops.stack.end(), _ops.stack[offset]) == _ops.stack.end()
+			)
+			{
+				// dup if we can
+				if (_ops.stack.dupReachable(offset))
+				{
+					_ops.stack.dup(offset);
+					return true;
+				}
+
+				// try to compress
+				if (shrinkStack(_ops.stack, _ops))
+					return true;
+
+				// todo stack too deep handling, the slot at offset is required in args but we can't reach it
+			}
+		}
+		return false;
+	}
+
 	static std::optional<StackOffset> suitableArgsOffsetFor(Ops const& _ops, StackOffset const& _outOfPositionOffset)
 	{
 		yulAssert(!_ops.isArgsCompatible(_outOfPositionOffset, _outOfPositionOffset));
@@ -613,7 +626,47 @@ private:
 			// if the stack reaches into the args region try fixing a slot in there
 			if (_stack.size() >= _targetStats.tailSize && fixArgsSlot(ops))
 				return true;
-			yulAssert(shrinkStack(_stack, ops));
+			if (shrinkStack(_stack, ops))
+				return true;
+			// todo: in the future we'll want stack too deep handling here and
+			//		 dup up the args if possible or mload them by explicitly calling _stack.reportStackTooDeep(arg)
+		}
+
+		if (_stack.size() < _targetStats.tailSize)
+		{
+			// if something is on the verge of going out of scope by duping something, dup that first
+			if (dupDeepSlotIfRequired(ops, _generateJunk))
+				return true;
+
+			// dup up the deepest slot that needs to go into args so we avoid having to fish it back up later
+			if (dupDeepestRelevantTailSlot(ops))
+				return true;
+
+			// todo we might also just dup up the deepest live-out variable instead for subsequent
+			//		passes and only if we can't push0
+			// meh
+			_stack.push(Slot::makeJunk());
+			return true;
+		}
+
+		// we are now in a position that we only have to potentially dup up args and/or fix the existing args slots
+		yulAssert(_targetStats.tailSize <= _stack.size() && _stack.size() <= _targetStats.targetSize);
+
+		// if there are no args, we should be done now
+		if (_targetStats.args.empty())
+		{
+			yulAssert(ops.stackAdmissible());
+			return false;
+		}
+
+		// of the existing args, can we improve the situation?
+		if (fixArgsSlot(ops))
+			return true;
+
+		// dup up whatever is missing
+		if (_stack.size() < _targetStats.targetSize)
+		{
+
 		}
 
 		yulAssert(false, "reached final and forbidden state");
