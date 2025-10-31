@@ -17,6 +17,25 @@
 
 #include <queue>
 #include <ranges>
+#include "AStarShuffler.h"
+#include "ExactShuffler.h"
+#include "libyul/backends/evm/SSACFGStackShuffler.h"
+#include "libyul/backends/evm/ssa/LivenessAnalysis.h"
+#include "range/v3/algorithm/count.hpp"
+#include "range/v3/algorithm/equal.hpp"
+#include "range/v3/algorithm/min_element.hpp"
+#include "range/v3/algorithm/none_of.hpp"
+#include "range/v3/algorithm/replace.hpp"
+#include "range/v3/algorithm/sort.hpp"
+#include "range/v3/numeric/accumulate.hpp"
+#include "range/v3/numeric/iota.hpp"
+#include "range/v3/view/drop.hpp"
+
+#include <libyul/backends/evm/ssa/StackLayoutGenerator.h>
+#include <libyul/backends/evm/ssa/OperationForwardShuffler.h>
+
+#include <queue>
+#include <ranges>
 
 using namespace solidity::yul;
 using namespace solidity::yul::ssa;
@@ -376,9 +395,6 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 			{
 				auto const tryTargetSize = pivot + delta;
 				if (tryTargetSize < 0 || tryTargetSize < minSize)
-					continue;
-
-				if (tryTargetSize != pivot)
 					continue;
 
 				if constexpr(debugOutput)
