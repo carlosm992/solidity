@@ -378,6 +378,9 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 				if (tryTargetSize < 0 || tryTargetSize < minSize)
 					continue;
 
+				if (tryTargetSize != pivot)
+					continue;
+
 				if constexpr(debugOutput)
 					std::cout << "\n\t\t\t -> target size = " << tryTargetSize << ": ";
 				// copy the current data
@@ -451,11 +454,18 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 		}
 		else
 		{
-			// todo might need to compress stack if unreachable
+			// todo might need to compress stack if unreachable; this should use the shuffler
 			if (liveOutUnion.contains(cjump->condition))
 			{
 				// need to dup
-				stack.pushOrDup(Slot::makeValueID(cjump->condition));
+				auto const condition = Slot::makeValueID(cjump->condition);
+				if (auto depth = stack.findSlotDepth(condition))
+					if (stack.dupReachable(*depth))
+						stack.dup(*depth);
+					else
+						stack.push(condition);
+				else
+					stack.push(condition);
 			}
 			else
 			{

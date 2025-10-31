@@ -202,7 +202,32 @@ struct DanielShuffler
 
 			void pushOrDupTarget(size_t _targetOffset)
 			{
-				currentStack.pushOrDup(targetStack[_targetOffset]);
+				auto const& slot = targetStack[_targetOffset];
+				std::optional<typename Stack::Depth> slotDepth = currentStack.findSlotDepth(slot);
+				if (slotDepth)
+				{
+					// if it's on stack and can be reached, dup
+					if (currentStack.dupReachable(*slotDepth))
+					{
+						currentStack.dup(*slotDepth);
+						return;
+					}
+				}
+
+				// if it's not on stack / too deep but can be pushed, push
+				if (currentStack.canBeFreelyGenerated(slot))
+				{
+					currentStack.push(slot);
+					return;
+				}
+
+				// stack too deep handling via callbacks, call dup anyway
+				if (slotDepth)
+				{
+					currentStack.dup(*slotDepth);
+					return;
+				}
+				yulAssert(false, "Invalid state: Tried to dup something that isn't on stack and can't be freely generated.");
 			}
 
 		};

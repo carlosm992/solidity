@@ -278,7 +278,7 @@ private:
 					else
 					{
 						// we need more of the slot that is about to go out of reach, dup it
-						_ops.stack.pushOrDup(slot);
+						_ops.stack.dup(sourceOffset);
 						return true;
 					}
 				}
