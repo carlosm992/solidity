@@ -630,6 +630,15 @@ private:
 				}
 			}
 
+		// if we're at size and would have to push or dup something to satisfy args, try shrinking
+		if (_ops.stack.size() == _ops.targetStats.targetSize)
+		{
+			for (auto const& arg: _ops.targetStats.args)
+				if (_ops.stackStats.totalCount(arg) < _ops.targetMinCount(arg))
+					if (shrinkStack(_ops.stack, _ops))
+						return true;
+
+		}
 		return false;
 	}
 
