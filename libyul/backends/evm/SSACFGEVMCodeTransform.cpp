@@ -229,7 +229,7 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			auto opLiveOutWithoutOutputs = opLiveOut;
 			for (auto const& output: operation.outputs)
 				opLiveOutWithoutOutputs.erase(output);
-			for (size_t depth = 0; depth < m_stack.size(); ++depth)
+			for (Stack<AssemblyCallbacks>::Depth depth {0}; depth.value < m_stack.size(); ++depth.value)
 				if (m_stack.slot(depth).isValueID() && !opLiveOutWithoutOutputs.contains(m_stack.slot(depth).valueID()) && ranges::find(requiredStackTop, m_stack.slot(depth)) == ranges::end(requiredStackTop))
 					m_stack.declareJunk(depth);
 			OperationForwardShuffler<AssemblyCallbacks>::shuffle(m_stack, requiredStackTop, opLiveOutWithoutOutputs, operationStackIn.size(), m_junkBlockFinder.blockAllowsAdditionOfJunk(_block));
@@ -302,22 +302,8 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 				// update symbolic stack by popping the condition
 				m_stack.pop<false>();
 				assertLayoutCompatibility(m_stack.data(), m_stackLayout[_conditionalJump.nonZero].stackIn);
-				/*auto stackIn = m_stackLayout[_conditionalJump.nonZero].stackIn;
-				// todo only emplace back if it's not already on top of the stack and it's not live-out
-				//if (stackIn.empty() || stackIn.back() != Slot{_conditionalJump.condition} || !m_liveness.liveOut(_block).contains(_conditionalJump.condition))
-				stackIn.emplace_back(_conditionalJump.condition);
-				if constexpr (debugOutput)
-					std::cout << "\t\tJUMPI Creating stack for nonZero layout (to Block " << _conditionalJump.nonZero.value << ") " << stackToString(m_stack.data(), m_cfg) << " -> " << stackToString(stackIn, m_cfg) << std::endl;
-				shuffleStack(stackIn, SSACFG::Edge{_block, _conditionalJump.nonZero});*/
 			}
 
-			// Emit the conditional jump to the non-zero label and update the stored stack.
-			/*{
-				yulAssert(m_stack.top() == Slot{_conditionalJump.condition});
-				m_assembly.appendJumpToIf(m_blockLabels[_conditionalJump.nonZero.value]);
-				// update symbolic stack by popping the condition
-				m_stack.pop<false>();
-			}*/
 			StackData const nonZeroStackData = m_stackData;
 
 			if constexpr (debugOutput)

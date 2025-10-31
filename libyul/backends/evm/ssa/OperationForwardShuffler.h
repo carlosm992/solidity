@@ -543,13 +543,48 @@ private:
 	static bool fixArgsSlot(Ops const& _ops)
 	{
 		yulAssert(_ops.stack.size() <= _ops.targetStats.targetSize, "this method assumes that the stack isn't too large");
-		if (_ops.stack.size() < _ops.targetStats.tailSize || _ops.stack.empty())
+		if (_ops.stack.size() <= _ops.targetStats.tailSize || _ops.stack.empty())
 			return false;
 
 		StackOffset const stackTop{_ops.stack.size() - 1};
+		// if the stack top isn't where it likes to be right now, try to put it somewhere more sensible
 		if (!_ops.isArgsCompatible(stackTop, stackTop))
 		{
-			// try finding a slot in args that is compatible with the top and also fixes the top
+			// if the stack top should go into the tail but isn't there yet
+			if (_ops.requiredInTail(_ops.stack[stackTop]) && _ops.stackStats.tailCount(_ops.stack[stackTop]) == 0)
+			{
+				// try swapping it with something in the tail that also fixes the top
+				for (StackOffset offset: stackTailRange(_ops.stack, _ops.targetStats.tailSize))
+					if (_ops.stack.swapReachable(offset) && _ops.isArgsCompatible(offset, stackTop))
+					{
+						_ops.stack.swap(offset);
+						return true;
+					}
+				// otherwise try swapping it with something that needs to go into args
+				for (StackOffset offset: stackTailRange(_ops.stack, _ops.targetStats.tailSize))
+					if (_ops.stack.swapReachable(offset) && _ops.stackStats.argsCount(_ops.stack[offset]) < _ops.targetArgsCount(_ops.stack[offset]))
+					{
+						_ops.stack.swap(offset);
+						return true;
+					}
+				// otherwise try swapping it with something that can be popped
+				for (StackOffset offset: stackTailRange(_ops.stack, _ops.targetStats.tailSize))
+					if (_ops.stack.swapReachable(offset) && _ops.stack.canBeFreelyGenerated(_ops.stack[offset]) && !_ops.stack[offset].isLiteralValueID())
+					{
+						_ops.stack.swap(offset);
+						return true;
+					}
+				// otherwise try swapping it with a literal
+				for (StackOffset offset: stackTailRange(_ops.stack, _ops.targetStats.tailSize))
+					if (_ops.stack.swapReachable(offset) && _ops.stack[offset].isLiteralValueID())
+					{
+						_ops.stack.swap(offset);
+						return true;
+					}
+			}
+			// try finding a slot that is compatible with the top and also admits the current top:
+			//		- could be that the top slot is used elsewhere in the args
+			//		- could be that the top slot is something that is only required in the tail
 			for (StackOffset offset: stackArgsRange(_ops.stack, _ops.targetStats.tailSize))
 				if (
 					offset != stackTop &&
@@ -568,7 +603,7 @@ private:
 					offset != stackTop &&
 					_ops.stack.swapReachable(offset) &&
 					!_ops.isArgsCompatible(offset, offset) &&
-					_ops.isArgsCompatible(offset, stackTop)
+					_ops.isArgsCompatible(stackTop, offset)
 				)
 				{
 					_ops.stack.swap(offset);
@@ -660,9 +695,10 @@ private:
 		}
 
 		// of the existing args, can we improve the situation?
-		// it can't happen that the tail needs stuff at this point as we already have admissibility in the
-		// tail distribution
 		if (fixArgsSlot(ops))
+			return true;
+
+		if (fixTailSlot(ops))
 			return true;
 
 		// dup up whatever is missing
@@ -708,6 +744,8 @@ private:
 					return true;
 				}
 			}
+
+			_stack.push(Slot::makeJunk());
 			return true;
 		}
 
@@ -715,9 +753,8 @@ private:
 
 		StackOffset stackTopOffset{_stack.size() - 1};
 
-		// try fix something
-		//if (fixArgsSlot(ops))
-		//	return true;
+		if (fixArgsSlot(ops))
+			return true;
 
 		// If we find a lower slot that is out of position, but also compatible with the top, swap that up.
 		for (StackOffset const offset: stackSwapReachableRange(_stack))

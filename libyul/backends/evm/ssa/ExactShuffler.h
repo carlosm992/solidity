@@ -1,4 +1,5 @@
 #pragma once
+#include "OperationForwardShuffler.h"
 #include "libyul/backends/evm/SSACFGStackLayout.h"
 #include "libyul/backends/evm/SSACFGStackShuffler.h"
 #include "libyul/backends/evm/ssa/SSACFG.h"
@@ -57,10 +58,15 @@ void shuffleStackExact(Stack& _stack, typename Stack::Data const& _target, SSACF
 				transformedTarget.push_back(slot);
 		}
 	}
+
 	DanielShuffler<Stack>::shuffle(
-		_stack,
-		{}, transformedTarget
+	_stack,
+	{}, transformedTarget
 	);
+	/*OperationForwardShuffler<typename Stack::Callbacks>::shuffle(
+		_stack,
+		transformedTarget, {}, transformedTarget.size(), false
+	);*/
 }
 
 }

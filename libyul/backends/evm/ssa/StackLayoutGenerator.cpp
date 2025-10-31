@@ -378,8 +378,6 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 				if (tryTargetSize < 0 || tryTargetSize < minSize)
 					continue;
 
-				if (pivot != tryTargetSize)
-					continue;
 				if constexpr(debugOutput)
 					std::cout << "\n\t\t\t -> target size = " << tryTargetSize << ": ";
 				// copy the current data
@@ -392,7 +390,8 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 					currentMinNumOps = countOpsStack.callbacks().numOps;
 					result = static_cast<std::size_t>(tryTargetSize);
 				}
-				std::cout << std::endl;
+				if constexpr(debugOutput)
+					std::cout << std::endl;
 			}
 			return result;
 		}();
