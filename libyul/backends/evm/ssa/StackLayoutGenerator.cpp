@@ -384,7 +384,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 					it->second = it->second > 0 ? it->second - 1 : 0;
 
 			// todo this should be a better heuristic. on revert paths vs returning paths.
-			int const pivot = stack.size() + ranges::accumulate(deficit | ranges::views::values, 0);
+			int const pivot = junkCanBeAdded ? stack.size() + requiredStackTop.size() : stack.size() + ranges::accumulate(deficit | ranges::views::values, 0);
 
 			std::size_t currentMinNumOps = std::numeric_limits<std::size_t>::max();
 

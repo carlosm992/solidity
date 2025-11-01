@@ -369,6 +369,15 @@ private:
 					}
 			}
 		}
+		// pop junk
+		for (StackOffset offset: stackSwapReachableRange(_stack))
+			if (_stack[offset].isJunk())
+			{
+				if (offset != stackTop)
+					_stack.swap(offset);
+				_stack.pop();
+				return true;
+			}
 		// pop something that can be freely generated except for literals
 		for (StackOffset offset: stackSwapReachableRange(_stack))
 			if (_stack.canBeFreelyGenerated(_stack[offset]) && !_stack[offset].isLiteralValueID())
@@ -550,8 +559,12 @@ private:
 		// if the stack top isn't where it likes to be right now, try to put it somewhere more sensible
 		if (!_ops.isArgsCompatible(stackTop, stackTop))
 		{
-			// if the stack top should go into the tail but isn't there yet
-			if (_ops.requiredInTail(_ops.stack[stackTop]) && _ops.stackStats.tailCount(_ops.stack[stackTop]) == 0)
+			// if the stack top should go into the tail but isn't there yet and we have enough of it in args
+			if (
+				_ops.requiredInTail(_ops.stack[stackTop]) &&
+				_ops.stackStats.tailCount(_ops.stack[stackTop]) == 0 &&
+				_ops.stackStats.argsCount(_ops.stack[stackTop]) > _ops.targetArgsCount(_ops.stack[stackTop])
+			)
 			{
 				// try swapping it with something in the tail that also fixes the top
 				for (StackOffset offset: stackTailRange(_ops.stack, _ops.targetStats.tailSize))
