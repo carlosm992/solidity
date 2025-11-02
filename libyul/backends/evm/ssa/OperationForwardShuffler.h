@@ -767,7 +767,8 @@ private:
 				}
 			}
 
-			_stack.push(Slot::makeJunk());
+			if (!dupDeepSlotIfRequired(ops, _generateJunk))
+				_stack.push(Slot::makeJunk());
 			return true;
 		}
 
