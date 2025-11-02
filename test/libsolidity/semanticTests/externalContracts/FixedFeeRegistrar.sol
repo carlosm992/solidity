@@ -74,8 +74,8 @@ contract FixedFeeRegistrar is Registrar {
 }
 // ----
 // constructor()
-// gas irOptimized: 78662
-// gas irOptimized code: 319600
+// gas irOptimized: 78862
+// gas irOptimized code: 321800
 // gas legacy: 115395
 // gas legacy code: 792400
 // gas legacyOptimized: 84598

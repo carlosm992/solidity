@@ -243,6 +243,7 @@ private:
 				// in the arguments
 				yulAssert(_ops.requiredInArgs(slot));
 
+				// todo why without args!? if it's there, it's there, that's fine
 				auto const [haveMoreAboveWithoutArgs, haveMoreAbove] = [&]
 				{
 					for (StackOffset offset{sourceOffset.value + 1}; offset < _ops.stack.size(); ++offset.value)
@@ -284,6 +285,12 @@ private:
 				}
 				else
 				{
+					std::optional<StackDepth> depth = _ops.stack.findSlotDepth(_ops.stack[sourceOffset]);
+					yulAssert(depth);
+					// if there's a shallower slot with the same info that is reachable, skip this one
+					if (*depth < _ops.stack.offsetToDepth(sourceOffset))
+						continue;
+
 					// the slot we need something in the args region of is unreachable, try compressing the stack,
 					// first looking at the top
 					if (shrinkStack(_ops.stack, _ops))
@@ -351,7 +358,7 @@ private:
 			if (!_ops.requiredInArgs(_stack[stackTop]) && _ops.requiredInTail(_stack[stackTop]))
 			{
 				// if it's already in tail, pop
-				if (_ops.stackStats.tailCount(_stack[stackTop]) > 1)
+				if (_ops.stackStats.tailCount(_stack[stackTop]) >= 1)
 				{
 					_stack.pop();
 					return true;
@@ -750,7 +757,7 @@ private:
 			for (StackOffset offset{ops.targetStats.tailSize}; offset < ops.targetStats.targetSize; ++offset.value)
 			{
 				Slot const& arg = ops.targetArg(offset);
-				if (ops.stackStats.totalCount(arg) < ops.targetMinCount(arg))
+				if (ops.stackStats.totalCount(arg) < ops.targetMinCount(arg) || ops.stackStats.argsCount(arg) < ops.targetArgsCount(arg))
 				{
 					if (auto sourceDepth = ops.stack.findSlotDepth(arg))
 					{
@@ -784,7 +791,8 @@ private:
 			if (
 				!ops.isArgsCompatible(offset, offset) &&
 				!ops.isSourceCompatible(offset, stackTopOffset) &&
-				ops.isArgsCompatible(offset, stackTopOffset)
+				ops.isArgsCompatible(offset, stackTopOffset) &&
+				ops.isArgsCompatible(stackTopOffset, offset)
 			)
 			{
 				_stack.swap(offset);
@@ -798,7 +806,9 @@ private:
 				if (
 					ops.offsetInTargetArgsRegion(offset) &&
 					!ops.isArgsCompatible(offset, offset) &&
-					!ops.isSourceCompatible(offset, stackTopOffset)
+					!ops.isSourceCompatible(offset, stackTopOffset) &&
+					ops.requiredInArgs(_stack[offset]) &&
+					ops.stackStats.argsCount(_stack[offset]) < ops.targetArgsCount(_stack[offset])
 				)
 				{
 					_stack.swap(offset);
