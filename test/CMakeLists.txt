@@ -159,6 +159,7 @@ set(libyul_sources
     libyul/ObjectCompilerTest.cpp
     libyul/ObjectCompilerTest.h
     libyul/ObjectParser.cpp
+    libyul/OperationForwardShufflerTest.cpp
     libyul/Parser.cpp
     libyul/SSAControlFlowGraphTest.cpp
     libyul/SSAControlFlowGraphTest.h

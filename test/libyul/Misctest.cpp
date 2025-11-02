@@ -104,7 +104,7 @@ BOOST_AUTO_TEST_CASE(yo)
 	PrintCallback callback([&stack, &cfg]
 	{
 		if (stack)
-			std::cout << ssa::stackToString(stack->data(), *cfg) << std::endl;
+			std::cout << ssa::stackToString(stack->data()) << std::endl;
 	});
 
 	FunctionCall funDeposit {
@@ -134,7 +134,7 @@ BOOST_AUTO_TEST_CASE(yo)
 		// mstore([JUNK x 7, v48, v49] -> { [v49] } + [v48, v49]) -> DUP1 + SWAP2 + SWAP1 +  -> [JUNK x 7, v49]
 		// staticcall([JUNK x 5, v113, v115, v119, v136, JUNK, JUNK, v139, v141] -> { [v113, v115, v119] } + [32, 0, v139, v136, 2, v141]) -> PUSH v13 + PUSH v6 + PUSH v140 + SWAP1 + SWAP4 + SWAP3 + SWAP7 + SWAP2 + SWAP5 + SWAP7 +  -> [JUNK x 5, v113, v115, v119, JUNK, JUNK, v142]
 
-		std::cout << fmt::format("--- start shuffle with {} ---", ssa::stackToString(stack->data(), *cfg)) << std::endl;
+		std::cout << fmt::format("--- start shuffle with {} ---", ssa::stackToString(stack->data())) << std::endl;
 		// TestStack::Data args{v79, v68};
 		{
 			auto const t = ranges::views::transform([&](ssa::SSACFG::ValueId _valueId) { return ssa::slotToString(SourceSlot::makeValueID(_valueId), *cfg); });
@@ -147,7 +147,7 @@ BOOST_AUTO_TEST_CASE(yo)
 		}
 		ssa::OperationForwardShuffler<PrintCallback>::shuffle(*stack, args, liveness, true, stack->size());
 		std::cout << "--- fin ---" << std::endl;
-		std::cout << ssa::stackToString(stack->data(), *cfg) << std::endl;
+		std::cout << ssa::stackToString(stack->data()) << std::endl;
 		final = stack->data();
 	}
 	{
