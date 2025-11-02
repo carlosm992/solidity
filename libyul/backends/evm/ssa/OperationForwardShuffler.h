@@ -510,6 +510,46 @@ private:
 		return false;
 	}
 
+	// Select the optimal slot to dup based on liveness analysis.
+	// Prioritizes slots that have the highest deficit with respect to liveOut counts.
+	// @returns the depth of the best slot to dup, or nullopt if no suitable slot exists.
+	static std::optional<StackDepth> selectOptimalSlotToDup(Ops const& _ops)
+	{
+		std::optional<StackDepth> bestSlot;
+		int bestDeficit = 0; // Only consider positive deficits
+
+		// Iterate through all slots on the stack
+		for (StackOffset offset: stackRange(_ops.stack))
+		{
+			Slot const& slot = _ops.stack[offset];
+
+			// Skip junk slots
+			if (slot.isJunk())
+				continue;
+
+			// Check if this slot is dup-reachable
+			if (!_ops.stack.dupReachable(offset))
+				continue;
+
+			// Calculate deficit: how many more of this slot do we need for liveOut?
+			int liveOutCount = 0;
+			if (slot.isValueID() && _ops.targetStats.liveOut.contains(slot.valueID()))
+				liveOutCount = static_cast<int>(_ops.targetStats.liveOut.count(slot.valueID()));
+
+			int currentCount = static_cast<int>(_ops.stackStats.totalCount(slot));
+			int deficit = liveOutCount - currentCount;
+
+			// Update best if this deficit is higher
+			if (deficit > bestDeficit)
+			{
+				bestDeficit = deficit;
+				bestSlot = _ops.stack.offsetToDepth(offset);
+			}
+		}
+
+		return bestSlot;
+	}
+
 	static bool dupDeepestRelevantTailSlot(Ops& _ops)
 	{
 		auto& stack = _ops.stack;
@@ -706,10 +746,18 @@ private:
 			if (dupDeepestRelevantTailSlot(ops))
 				return true;
 
-			// todo we might also just dup up the deepest live-out variable instead for subsequent
-			//		passes and only if we can't push0
-			// meh
-			_stack.push(Slot::makeJunk());
+			// Try to dup the optimal slot based on liveness analysis
+			if (auto slotToDup = selectOptimalSlotToDup(ops))
+			{
+				if (!dupDeepSlotIfRequired(ops, _generateJunk))
+					_stack.dup(*slotToDup);
+			}
+			else
+			{
+				// If no suitable slot found, push junk
+				if (!dupDeepSlotIfRequired(ops, _generateJunk))
+					_stack.push(Slot::makeJunk());
+			}
 			return true;
 		}
 
@@ -775,7 +823,20 @@ private:
 			}
 
 			if (!dupDeepSlotIfRequired(ops, _generateJunk))
-				_stack.push(Slot::makeJunk());
+			{
+				// Try to dup the optimal slot based on liveness analysis
+				if (auto slotToDup = selectOptimalSlotToDup(ops))
+				{
+					if (!dupDeepSlotIfRequired(ops, _generateJunk))
+						_stack.dup(*slotToDup);
+				}
+				else
+				{
+					// If no suitable slot found, push junk
+					if (!dupDeepSlotIfRequired(ops, _generateJunk))
+						_stack.push(Slot::makeJunk());
+				}
+			}
 			return true;
 		}
 
