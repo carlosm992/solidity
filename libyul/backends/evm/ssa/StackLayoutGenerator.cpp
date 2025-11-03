@@ -321,7 +321,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 	bool const junkCanBeAdded = m_junkBlockFinder.blockAllowsAdditionOfJunk(_blockId);
 	if constexpr (debugOutput)
 		std::cout << fmt::format(
-			"\tBlock {} (junk={}, stackIn={})\n", _blockId, junkCanBeAdded, stackToString(currentStackData, m_cfg));
+			"\tBlock {} (junk={}, stackIn={})\n", _blockId, junkCanBeAdded, stackToString(currentStackData));
 
 	SSACFG::BasicBlock const& block = m_cfg.block(_blockId);
 
@@ -342,7 +342,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 				[](SSACFG::BuiltinCall const& _call) { return _call.builtin.get().name; },
 				[](SSACFG::LiteralAssignment const&) -> std::string { return "assign"; }
 			}, operation.kind);
-			std::cout << "\t\t" << operationName << "(" << stackToString(currentStackData, m_cfg) << " -> ";
+			std::cout << "\t\t" << operationName << "(" << stackToString(currentStackData) << " -> ";
 		}
 
 		// literals should have been pulled out a priori and now are treated as push constants
@@ -369,7 +369,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 
 		// declareJunk(stack, opLiveOutWithoutOutputs );
 		if constexpr(debugOutput)
-			std::cout << "{ " << stackToString(liveOutWithoutOutputs | ranges::views::transform(Slot::makeValueID) | ranges::to<std::vector>, m_cfg) << " } + " << stackToString(requiredStackTop, m_cfg) << ") -> " << std::flush;
+			std::cout << "{ " << stackToString(liveOutWithoutOutputs | ranges::views::transform(Slot::makeValueID) | ranges::to<std::vector>) << " } + " << stackToString(requiredStackTop) << ") -> " << std::flush;
 
 		std::size_t const targetSize = [&]
 		{
@@ -445,7 +445,7 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 			#if !defined(NDEBUG)
 			StackManipulationCallbacks::writeCallbackOutput = true;
 			#endif
-			fmt::print(" -> {}\n", stackToString(currentStackData, m_cfg));
+			fmt::print(" -> {}\n", stackToString(currentStackData));
 		}
 	}
 
@@ -516,5 +516,5 @@ void StackLayoutGenerator::visitBlock(SSACFG::BlockId const& _blockId)
 	m_stackLayout[_blockId].stackOut = currentStackData;
 
 	if constexpr (debugOutput)
-		std::cout << fmt::format("\t\tstack out = {}\n", stackToString(currentStackData, m_cfg));
+		std::cout << fmt::format("\t\tstack out = {}\n", stackToString(currentStackData));
 }

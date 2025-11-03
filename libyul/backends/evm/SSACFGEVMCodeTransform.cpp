@@ -212,7 +212,7 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 				[](SSACFG::BuiltinCall const& _call) { return _call.builtin.get().name; },
 				[](SSACFG::LiteralAssignment const&) -> std::string { return "assign"; }
 			}, operation.kind);
-			std::cout << "\t\t" << operationName << ": " << stackToString(m_stack.data(), m_cfg) << " -> " << stackToString(operationStackIn, m_cfg) << std::endl;
+			std::cout << "\t\t" << operationName << ": " << stackToString(m_stack.data()) << " -> " << stackToString(operationStackIn) << std::endl;
 		}
 		if (true)
 		{
@@ -307,7 +307,7 @@ void SSACFGEVMCodeTransform::operator()(SSACFG::BlockId const _block)
 			StackData const nonZeroStackData = m_stackData;
 
 			if constexpr (debugOutput)
-				std::cout << "\t\tJUMPI Creating stack for zero layout (to Block " << _conditionalJump.zero.value << ") " << stackToString(m_stack.data(), m_cfg) << " -> " << stackToString(m_stackLayout[_conditionalJump.zero].stackIn, m_cfg) << std::endl;
+				std::cout << "\t\tJUMPI Creating stack for zero layout (to Block " << _conditionalJump.zero.value << ") " << stackToString(m_stack.data()) << " -> " << stackToString(m_stackLayout[_conditionalJump.zero].stackIn) << std::endl;
 
 			shuffleStack(
 				m_stackLayout[_conditionalJump.zero].stackIn,
@@ -367,7 +367,7 @@ void SSACFGEVMCodeTransform::performOperation(SSACFG::Operation const& _operatio
 	std::visit(util::GenericVisitor {
 		[&](SSACFG::BuiltinCall const& _builtin) {
 			if constexpr (debugOutput)
-				std::cout << "\t\t\tBuiltin call: " << _builtin.builtin.get().name << ": " << stackToString(m_stack.data(), m_cfg);
+				std::cout << "\t\t\tBuiltin call: " << _builtin.builtin.get().name << ": " << stackToString(m_stack.data());
 			m_assembly.setSourceLocation(originLocationOf(_builtin));
 			static_cast<BuiltinFunctionForEVM const&>(_builtin.builtin.get()).generateCode(
 				_builtin.call,
@@ -380,7 +380,7 @@ void SSACFGEVMCodeTransform::performOperation(SSACFG::Operation const& _operatio
 			yulAssert(!!returnLabel == _call.canContinue);
 			if constexpr (debugOutput)
 			{
-				std::cout << "\t\t\tCall: " << _call.function.get().name.str() << " (label=" << functionLabel(_call.function) << ")" << ": " << stackToString(m_stack.data(), m_cfg);
+				std::cout << "\t\t\tCall: " << _call.function.get().name.str() << " (label=" << functionLabel(_call.function) << ")" << ": " << stackToString(m_stack.data());
 				if (returnLabel)
 					std::cout << ", returnLabel: " << *returnLabel;
 			}
@@ -399,7 +399,7 @@ void SSACFGEVMCodeTransform::performOperation(SSACFG::Operation const& _operatio
 		[&](SSACFG::LiteralAssignment const&)
 		{
 			if constexpr (debugOutput)
-				std::cout << "\t\t\tLiteral assignment: " << stackToString(m_stack.data(), m_cfg);
+				std::cout << "\t\t\tLiteral assignment: " << stackToString(m_stack.data());
 		}
 	}, _operation.kind);
 	for (size_t i = 0; i < _operation.inputs.size(); ++i)
@@ -408,14 +408,14 @@ void SSACFGEVMCodeTransform::performOperation(SSACFG::Operation const& _operatio
 		m_stack.push<false>(Slot::makeValueID(value));
 
 	if constexpr (debugOutput)
-		std::cout << " -> " << stackToString(m_stack.data(), m_cfg) << std::endl;
+		std::cout << " -> " << stackToString(m_stack.data()) << std::endl;
 }
 
 void SSACFGEVMCodeTransform::assertLayoutCompatibility(StackData const& _current, StackData const& _desired) const
 {
 	yulAssert(
 		_current.size() == _desired.size(),
-		fmt::format("size mismatch: {} = len({}) =/= len({}) = {}", _current.size(), stackToString(_current, m_cfg), stackToString(_desired, m_cfg), _desired.size())
+		fmt::format("size mismatch: {} = len({}) =/= len({}) = {}", _current.size(), stackToString(_current), stackToString(_desired), _desired.size())
 	);
 	for (auto&& [index, currentSlot, desiredSlot]: ranges::zip_view(ranges::views::iota(0), _current, _desired))
 		yulAssert(
@@ -423,9 +423,9 @@ void SSACFGEVMCodeTransform::assertLayoutCompatibility(StackData const& _current
 			fmt::format(
 				"stack element mismatch: {} = {}[{}] =/= {}[{}] = {}",
 				slotToString(currentSlot, m_cfg),
-				stackToString(_current, m_cfg),
+				stackToString(_current),
 				index,
-				stackToString(_desired, m_cfg),
+				stackToString(_desired),
 				index,
 				slotToString(desiredSlot, m_cfg)
 			)

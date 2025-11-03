@@ -68,14 +68,13 @@ private:
 				_stack.pop();
 				break;
 			case Type::SWAP:
-				_stack.swap(arg);
+				_stack.swap(typename Stack::Depth{arg});
 				break;
 			case Type::DUP:
-				yulAssert(pushValue);
-				_stack.dup(*pushValue);
+				_stack.dup(typename Stack::Depth{arg});
 				break;
 			case Type::JUNK:
-				_stack.declareJunk(arg);
+				_stack.declareJunk(typename Stack::Depth{arg});
 				break;
 			}
 		}
@@ -332,7 +331,7 @@ private:
 						result.emplace_back(_state, Operation{Operation::Type::SWAP, i, std::nullopt});
 						auto& state = std::get<0>(result.back());
 						Stack stack(state.stackData, {});
-						stack.swap(i);
+						stack.swap(typename Stack::Depth{i});
 					}
 				}
 			}
@@ -358,7 +357,7 @@ private:
 					result.emplace_back(_state, Operation{Operation::Type::DUP, depth, slotToDup});
 					State& state = std::get<0>(result.back());
 					Stack stack(state.stackData, {});
-					stack.dup(slotToDup);
+					stack.dup(typename Stack::Depth{depth});
 					state.histogram[state.stackData.back()] += 1;
 				}
 			}
