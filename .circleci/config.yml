@@ -2099,7 +2099,7 @@ workflows:
 
       # Final artifacts
       - c_release_binaries:
-          <<: *on_version_tags
+          <<: *on_all_tags_and_branches
           requires:
             - b_ubu_static_arm
             - b_ubu_static
