@@ -13,4 +13,4 @@ contract B {
     }
 }
 // ----
-// Warning 9207: (227-246): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}()' instead.
+// Warning 9207: (227-246): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
