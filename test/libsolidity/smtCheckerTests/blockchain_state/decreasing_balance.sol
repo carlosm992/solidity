@@ -5,7 +5,8 @@ contract C {
 	}
 	function f(address payable a, uint x) public {
 		require(address(this).balance >= x);
-		a.transfer(x);
+		(bool success, ) = a.call{value: x}("");
+		require(success);
 	}
 	function inv() public view {
 		// If only looking at `f`, it looks like this.balance always decreases.
@@ -18,5 +19,3 @@ contract C {
 // ====
 // SMTEngine: all
 // ----
-// Warning 9207: (160-170): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Info 1391: CHC: 1 verification condition(s) proved safe! Enable the model checker option "show proved safe" to see all of them.

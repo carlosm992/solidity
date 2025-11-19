@@ -3,7 +3,8 @@ contract C
 	function f(address payable a) public {
 		uint x = 100;
 		require(x == a.balance);
-		a.transfer(600);
+		bool success;
+		(success, ) = a.call{value:600}("");
 		// This fails since a == this is possible.
 		assert(a.balance == 700);
 	}
@@ -11,6 +12,4 @@ contract C
 // ====
 // SMTEngine: all
 // ----
-// Warning 9207: (98-108): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Warning 8656: (98-113): CHC: Insufficient funds happens here.\nCounterexample:\n\na = 0x51f0\nx = 100\n\nTransaction trace:\nC.constructor()\nC.f(0x51f0)
-// Warning 6328: (162-186): CHC: Assertion violation happens here.\nCounterexample:\n\na = 0x0\nx = 100\n\nTransaction trace:\nC.constructor()\nC.f(0x0)
+// Warning 6328: (198-222): CHC: Assertion violation happens here.\nCounterexample:\n\na = 0x0\nx = 100\nsuccess = false\n\nTransaction trace:\nC.constructor()\nC.f(0x0)\n    a.call{value:600}("") -- untrusted external call

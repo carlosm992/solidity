@@ -2,8 +2,8 @@
     "errors": [
         {
             "component": "general",
-            "formattedMessage": "settings.modelChecker.targets must be a non-empty array.",
-            "message": "settings.modelChecker.targets must be a non-empty array.",
+            "formattedMessage": "parse error at line 7, column 458: syntax error while parsing object - unexpected string literal; expected '}'",
+            "message": "parse error at line 7, column 458: syntax error while parsing object - unexpected string literal; expected '}'",
             "severity": "error",
             "type": "JSONError"
         }

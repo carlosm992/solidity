@@ -1,5 +1,6 @@
 function l(address payable a) {
-	a.transfer(1);
+	(bool success, ) = a.call{value: 1}("");
+	require(success);
 }
 
 contract C {
@@ -19,6 +20,6 @@ contract C {
 // SMTEngine: all
 // SMTIgnoreCex: yes
 // ----
-// Warning 9207: (33-43): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Warning 6328: (258-274): CHC: Assertion violation happens here.\nCounterexample:\nx = 0\na = 0x7e1e\nb1 = 38\nb2 = 37\n\nTransaction trace:\nC.constructor()\nState: x = 0\nC.f(0x7e1e){ msg.value: 17 }\n    l(0x7e1e) -- internal call
-// Info 1391: CHC: 4 verification condition(s) proved safe! Enable the model checker option "show proved safe" to see all of them.
+// Warning 6328: (303-319): CHC: Assertion violation happens here.\nCounterexample:\nx = 0\na = 0x0\nb1 = 38\nb2 = 37\n\nTransaction trace:\nC.constructor()\nState: x = 0\nC.f(0x0){ msg.value: 10 }\n    l(0x0) -- internal call\n        a.call{value: 1}("") -- untrusted external call
+// Warning 6328: (338-358): CHC: Assertion violation happens here.
+// Info 1391: CHC: 2 verification condition(s) proved safe! Enable the model checker option "show proved safe" to see all of them.

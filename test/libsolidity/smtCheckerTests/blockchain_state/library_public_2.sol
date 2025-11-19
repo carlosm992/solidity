@@ -1,6 +1,7 @@
 library L {
 	function l(address payable a) public {
-		a.transfer(1);
+		(bool success, ) = a.call{value: 1}("");
+		require(success);
 	}
 }
 
@@ -20,8 +21,6 @@ contract C {
 // SMTEngine: all
 // SMTIgnoreCex: yes
 // ----
-// Warning 9207: (54-64): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Warning 4588: (238-243): Assertion checker does not yet implement this type of function call.
-// Warning 8656: (54-67): CHC: Insufficient funds happens here.\nCounterexample:\n\na = 0x0\n\nTransaction trace:\nL.constructor()\nL.l(0x0)
-// Warning 6328: (282-298): CHC: Assertion violation happens here.\nCounterexample:\nx = 0\na = 0x0\nb1 = 15923\nb2 = 15924\n\nTransaction trace:\nC.constructor()\nState: x = 0\nC.f(0x0){ msg.value: 15923 }
-// Warning 6328: (317-331): CHC: Assertion violation happens here.\nCounterexample:\nx = 1\na = 0x0\nb1 = 15923\nb2 = 15924\n\nTransaction trace:\nC.constructor()\nState: x = 0\nC.f(0x0){ msg.value: 15923 }
+// Warning 4588: (284-289): Assertion checker does not yet implement this type of function call.
+// Warning 6328: (328-344): CHC: Assertion violation happens here.\nCounterexample:\nx = 0\na = 0x0\nb1 = 15923\nb2 = 15924\n\nTransaction trace:\nC.constructor()\nState: x = 0\nC.f(0x0){ msg.value: 15923 }
+// Warning 6328: (363-377): CHC: Assertion violation happens here.\nCounterexample:\nx = 1\na = 0x0\nb1 = 8947\nb2 = 8948\n\nTransaction trace:\nC.constructor()\nState: x = 0\nC.f(0x0){ msg.value: 8947 }

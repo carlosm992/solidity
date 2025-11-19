@@ -1,9 +1,3 @@
-Warning: 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-  --> input.sol:10:3:
-   |
-10 | 		a.transfer(x);
-   | 		^^^^^^^^^^
-
 Warning: BMC: Underflow (resulting value less than 0) happens here.
  --> input.sol:7:3:
   |
@@ -12,7 +6,9 @@ Warning: BMC: Underflow (resulting value less than 0) happens here.
 Note: Counterexample:
   <result> = (- 1)
   a = 0
+  success = false
   x = 0
 
 Note: Callstack:
-Note:
+Note: 
+Note that external function calls are not inlined, even if the source code of the function is available. This is due to the possibility that the actual called contract has the same ABI but implements the function differently.

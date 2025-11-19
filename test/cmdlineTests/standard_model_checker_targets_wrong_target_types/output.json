@@ -2,8 +2,8 @@
     "errors": [
         {
             "component": "general",
-            "formattedMessage": "Every target in settings.modelChecker.targets must be a string.",
-            "message": "Every target in settings.modelChecker.targets must be a string.",
+            "formattedMessage": "parse error at line 7, column 458: syntax error while parsing object - unexpected string literal; expected '}'",
+            "message": "parse error at line 7, column 458: syntax error while parsing object - unexpected string literal; expected '}'",
             "severity": "error",
             "type": "JSONError"
         }

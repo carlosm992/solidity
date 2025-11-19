@@ -1,14 +1,9 @@
-Warning: 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-  --> input.sol:10:3:
-   |
-10 | 		a.transfer(x);
-   | 		^^^^^^^^^^
-
 Warning: CHC: Underflow (resulting value less than 0) happens here.
 Counterexample:
 arr = []
 a = 0x0
 x = 0
+success = false
 
 Transaction trace:
 test.constructor()
@@ -24,6 +19,7 @@ Counterexample:
 arr = []
 a = 0x0
 x = 1
+success = false
 
 Transaction trace:
 test.constructor()
@@ -39,6 +35,7 @@ Counterexample:
 arr = []
 a = 0x0
 x = 0
+success = false
 
 Transaction trace:
 test.constructor()
@@ -54,14 +51,16 @@ Counterexample:
 arr = []
 a = 0x0
 x = 0
+success = true
 
 Transaction trace:
 test.constructor()
 State: arr = []
 test.f(0x0, 1)
-  --> input.sol:11:3:
+    a.call{value: x}("") -- untrusted external call
+  --> input.sol:12:3:
    |
-11 | 		assert(x > 0);
+12 | 		assert(x > 0);
    | 		^^^^^^^^^^^^^
 
 Warning: CHC: Empty array "pop" happens here.
@@ -69,14 +68,16 @@ Counterexample:
 arr = []
 a = 0x0
 x = 0
+success = true
 
 Transaction trace:
 test.constructor()
 State: arr = []
 test.f(0x0, 1)
-  --> input.sol:12:3:
+    a.call{value: x}("") -- untrusted external call
+  --> input.sol:13:3:
    |
-12 | 		arr.pop();
+13 | 		arr.pop();
    | 		^^^^^^^^^
 
 Warning: CHC: Out of bounds access happens here.
@@ -84,14 +85,14 @@ Counterexample:
 arr = []
 a = 0x0
 x = 0
+success = true
 
 Transaction trace:
 test.constructor()
 State: arr = []
 test.f(0x0, 1)
-  --> input.sol:13:3:
+    a.call{value: x}("") -- untrusted external call
+  --> input.sol:14:3:
    |
-13 | 		arr[x];
+14 | 		arr[x];
    | 		^^^^^^
-
-Info: CHC: 1 verification condition(s) proved safe! Enable the model checker option "show proved safe" to see all of them.

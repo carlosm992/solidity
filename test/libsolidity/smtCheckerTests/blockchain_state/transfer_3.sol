@@ -2,11 +2,10 @@ contract C {
 	address payable recipient;
 
 	function shouldFail() public {
-		recipient.transfer(1);
+		(bool success, ) = recipient.call{value: 1}("");
+		require(success);
 	}
 }
 // ====
 // SMTEngine: all
 // ----
-// Warning 9207: (76-94): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Warning 8656: (76-97): CHC: Insufficient funds happens here.\nCounterexample:\nrecipient = 0x0\n\nTransaction trace:\nC.constructor()\nState: recipient = 0x0\nC.shouldFail()

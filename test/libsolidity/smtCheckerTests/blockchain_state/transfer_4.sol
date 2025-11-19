@@ -3,11 +3,12 @@ contract C {
 
 	function f() public payable {
 		require(msg.value > 1);
-		recipient.transfer(1);
+		bool success;
+		recipient.call{value: 1}("");
 	}
 }
 // ====
 // SMTEngine: all
 // ----
-// Warning 9207: (101-119): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Info 1391: CHC: 1 verification condition(s) proved safe! Enable the model checker option "show proved safe" to see all of them.
+// Warning 9302: (117-145): Return value of low-level calls not used.
+// Warning 2072: (101-113): Unused local variable.

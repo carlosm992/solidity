@@ -1,10 +1,9 @@
 contract C {
 	function f(address payable a) public {
-		a.transfer(200);
+		(bool success, ) = a.call{value: 200}("");
+		require(success);
 	}
 }
 // ====
 // SMTEngine: bmc
 // ----
-// Warning 9207: (55-65): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Warning 1236: (55-70): BMC: Insufficient funds happens here.

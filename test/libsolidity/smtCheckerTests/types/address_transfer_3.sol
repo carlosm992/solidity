@@ -3,7 +3,8 @@ contract C
 	function f(address payable a) public {
 		require(1000 == address(this).balance);
 		require(100 == a.balance);
-		a.transfer(600);
+		bool success;
+		(success, ) = a.call{value:600}("");
 		// a == this is not possible because address(this).balance == 1000
 		// and a.balance == 100,
 		// so this should hold in CHC, ignoring the transfer revert.
@@ -13,5 +14,4 @@ contract C
 // ====
 // SMTEngine: all
 // ----
-// Warning 9207: (126-136): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Info 1391: CHC: 2 verification condition(s) proved safe! Enable the model checker option "show proved safe" to see all of them.
+// Warning 6328: (340-364): CHC: Assertion violation happens here.\nCounterexample:\n\na = 0x20ae\nsuccess = false\n\nTransaction trace:\nC.constructor()\nC.f(0x20ae)\n    a.call{value:600}("") -- untrusted external call

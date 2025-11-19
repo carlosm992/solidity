@@ -4,13 +4,12 @@ contract C {
 
 	function shouldHold() public {
 		uint tempAmount = address(this).balance;
-		recipient.transfer(tempAmount);
-		recipient.transfer(amount);
+		(bool success, ) = recipient.call{value: tempAmount}("");
+		require(success);
+		(success, ) = recipient.call{value: amount}("");
+		require(success);
 	}
 }
 // ====
 // SMTEngine: chc
 // ----
-// Warning 9207: (133-151): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Warning 9207: (167-185): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Info 1391: CHC: 2 verification condition(s) proved safe! Enable the model checker option "show proved safe" to see all of them.

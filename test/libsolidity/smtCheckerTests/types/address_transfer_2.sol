@@ -5,8 +5,9 @@ contract C
 		require(x == 100);
 		require(x == a.balance);
 		require(a.balance == b.balance);
-		a.transfer(600);
-		b.transfer(100);
+		bool success;
+		(success, ) = a.call{value:600}("");
+		(success, ) = b.call{value:100}("");
 		// Fails since a == this is possible.
 		assert(a.balance > b.balance);
 	}
@@ -15,8 +16,4 @@ contract C
 // SMTEngine: all
 // SMTIgnoreCex: yes
 // ----
-// Warning 9207: (184-194): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Warning 9207: (203-213): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Warning 8656: (184-199): CHC: Insufficient funds happens here.\nCounterexample:\n\nx = 100\na = 0x6532\nb = 0xffffffffffffffffffffffffffffffffffffed9d\n\nTransaction trace:\nC.constructor()\nC.f(100, 0x6532, 0xffffffffffffffffffffffffffffffffffffed9d)
-// Warning 8656: (203-218): CHC: Insufficient funds happens here.\nCounterexample:\n\nx = 100\na = 0x08c0\nb = 0x7992\n\nTransaction trace:\nC.constructor()\nC.f(100, 0x08c0, 0x7992)
-// Warning 6328: (262-291): CHC: Assertion violation happens here.\nCounterexample:\n\nx = 100\na = 0x08c1\nb = 0x08c0\n\nTransaction trace:\nC.constructor()\nC.f(100, 0x08c1, 0x08c0)
+// Warning 6328: (318-347): CHC: Assertion violation happens here.\nCounterexample:\n\nx = 100\na = 0x0\nb = 0xffffffffffffffffffffffffffffffffffffdf52\nsuccess = false\n\nTransaction trace:\nC.constructor()\nC.f(100, 0x0, 0xffffffffffffffffffffffffffffffffffffdf52)\n    a.call{value:600}("") -- untrusted external call\n    b.call{value:100}("") -- untrusted external call

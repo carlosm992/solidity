@@ -7,7 +7,8 @@ contract C {
 		require(_v < 10);
 		require(c < 2);
 		++c;
-		_a.transfer(_v);
+		(bool success, ) = _a.call{value: _v}("");
+		require(success);
 	}
 	function inv() public view {
 		assert(address(this).balance > 80); // should hold
@@ -18,6 +19,7 @@ contract C {
 // SMTEngine: all
 // SMTIgnoreCex: yes
 // ----
-// Warning 9207: (175-186): 'transfer' is deprecated and scheduled for removal in the next breaking version (0.9). Use 'call{value: <amount>}("")' instead.
-// Warning 6328: (280-314): CHC: Assertion violation happens here.
-// Info 1391: CHC: 3 verification condition(s) proved safe! Enable the model checker option "show proved safe" to see all of them.
+// Warning 6328: (273-307): CHC: Assertion violation might happen here.
+// Warning 6328: (326-360): CHC: Assertion violation happens here.\nCounterexample:\nc = 2\n\nTransaction trace:\nC.constructor(){ msg.value: 101 }\nState: c = 0\nC.f(0x0, 9)\n    _a.call{value: _v}("") -- untrusted external call\nState: c = 1\nC.f(0x0, 9)\n    _a.call{value: _v}("") -- untrusted external call\nState: c = 2\nC.inv()
+// Info 1391: CHC: 1 verification condition(s) proved safe! Enable the model checker option "show proved safe" to see all of them.
+// Warning 4661: (273-307): BMC: Assertion violation happens here.
