@@ -237,14 +237,15 @@ public:
 	void dup(Depth const& _depth) { dup(depthToOffset(_depth)); }
 	void dup(Offset const& _offset)
 	{
-		yulAssert(dupReachable(_offset), "Stack too deep");
+		auto const depth = offsetToDepth(_offset);
+		yulAssert(dupReachable(depth), "Stack too deep");
 		m_data->push_back((*m_data)[_offset.value]);
 		if constexpr (!std::is_same_v<Callbacks, NoOpStackManipulationCallbacks>)
-			m_callbacks.dup(offsetToDepth(_offset).value + 1);
+			m_callbacks.dup(depth.value + 1);
 	}
 
 	bool dupReachable(Offset const& _offset) const noexcept { return dupReachable(offsetToDepth(_offset)); }
-	bool dupReachable(Depth const& _depth) const noexcept { return _depth < size() && _depth.value + 1 <= reachableStackDepth; }
+	bool dupReachable(Depth const& _depth) const noexcept { return _depth < size() && _depth.value < reachableStackDepth; }
 	bool swapReachable(Offset const& _offset) const noexcept { return swapReachable(offsetToDepth(_offset)); }
 	bool swapReachable(Depth const& _depth) const noexcept { return _depth < size() && 1 <= _depth.value && _depth.value <= reachableStackDepth; }
 
