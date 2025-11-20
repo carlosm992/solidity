@@ -307,6 +307,21 @@ bool isEthdebugRequested(Json const& _outputSelection)
 	return false;
 }
 
+bool isExperimentalArtifactRequested(Json const& _outputSelection)
+{
+	std::set<std::string> experimentalArtifacts{"irAst", "irOptimizedAst", "yulCFGJson"};
+	if (!_outputSelection.is_object())
+		return false;
+
+	for (auto const& fileRequests: _outputSelection)
+		for (auto const& requests: fileRequests)
+			for (auto const& request: requests)
+				if (experimentalArtifacts.contains(request))
+					return true;
+
+	return false;
+}
+
 /// @returns The set of selected contracts, along with their compiler pipeline configuration, based
 /// on outputs requested in the JSON. Translates wildcards to the ones understood by CompilerStack.
 /// Note that as an exception, '*' does not yet match "ir", "irAst", "irOptimized" or "irOptimizedAst".
@@ -430,7 +445,7 @@ std::optional<Json> checkAuxiliaryInputKeys(Json const& _input)
 
 std::optional<Json> checkSettingsKeys(Json const& _input)
 {
-	static std::set<std::string> keys{"debug", "evmVersion", "eofVersion", "libraries", "metadata", "modelChecker", "optimizer", "outputSelection", "remappings", "stopAfter", "viaIR"};
+	static std::set<std::string> keys{"debug", "evmVersion", "experimental", "eofVersion", "libraries", "metadata", "modelChecker", "optimizer", "outputSelection", "remappings", "stopAfter", "viaIR"};
 	return checkKeys(_input, keys, "settings");
 }
 
@@ -802,6 +817,13 @@ std::variant<StandardCompiler::InputsAndSettings, Json> StandardCompiler::parseI
 
 	if (auto result = checkSettingsKeys(settings))
 		return *result;
+
+	if (settings.contains("experimental"))
+	{
+		if (!settings["experimental"].is_boolean())
+			return formatFatalError(Error::Type::JSONError, "\"settings.experimental\" must be a Boolean.");
+		ret.experimental = settings["experimental"].get<bool>();
+	}
 
 	if (settings.contains("stopAfter"))
 	{
@@ -1213,6 +1235,21 @@ std::variant<StandardCompiler::InputsAndSettings, Json> StandardCompiler::parseI
 		if (ret.optimiserSettings.runYulOptimiser)
 			solUnimplemented("Optimization is not yet supported with ethdebug.");
 
+	if (!ret.experimental)
+	{
+		if (ret.language == "SolidityAST" || ret.language == "EVMAssembly")
+			return formatFatalError(Error::Type::FatalError, "'SolidityAST' and 'EVMAssembly' inputs are experimental, and can only be used by toggling the 'settings.experimental' option.");
+
+		if (isExperimentalArtifactRequested(ret.outputSelection))
+			return formatFatalError(Error::Type::FatalError, "'irAst', 'irOptimizedAst' and 'yulCFGJson' outputs are experimental, and can only be used by toggling the 'settings.experimental' option.");
+
+		if (isEthdebugRequested(ret.outputSelection))
+			return formatFatalError(Error::Type::FatalError, "'settings.debug.debugInfo.ethdebug' is experimental, and can only be used by toggling the 'settings.experimental' option.");
+
+		if (ret.eofVersion)
+			return formatFatalError(Error::Type::FatalError, "'eofVersion' is experimental, and can only be used by toggling the 'settings.experimental' option.");
+	}
+
 	return {std::move(ret)};
 }
 
@@ -1373,6 +1410,7 @@ Json StandardCompiler::compileSolidity(StandardCompiler::InputsAndSettings _inpu
 	compilerStack.setMetadataHash(_inputsAndSettings.metadataHash);
 	compilerStack.selectContracts(pipelineConfig(_inputsAndSettings.outputSelection));
 	compilerStack.setModelCheckerSettings(_inputsAndSettings.modelCheckerSettings);
+	compilerStack.setExperimental(_inputsAndSettings.experimental);
 
 	Json errors = std::move(_inputsAndSettings.errors);
 

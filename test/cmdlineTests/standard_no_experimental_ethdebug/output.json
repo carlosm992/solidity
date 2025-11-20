@@ -1,0 +1,11 @@
+{
+    "errors": [
+        {
+            "component": "general",
+            "formattedMessage": "'settings.debug.debugInfo.ethdebug' is experimental, and can only be used by toggling the 'settings.experimental' option.",
+            "message": "'settings.debug.debugInfo.ethdebug' is experimental, and can only be used by toggling the 'settings.experimental' option.",
+            "severity": "error",
+            "type": "FatalError"
+        }
+    ]
+}

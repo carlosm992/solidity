@@ -296,6 +296,13 @@ Json generateStandardJson(bool _viaIr, Json const& _debugInfoSelection, Json con
 	return result;
 }
 
+Json generateExperimentalStandardJson(bool _viaIr, Json const& _debugInfoSelection, Json const& _outputSelection, Code const& _code = SolidityCode(), bool _advancedOutputSelection = false)
+{
+	Json result = generateStandardJson(_viaIr, _debugInfoSelection, _outputSelection, _code, _advancedOutputSelection);
+	result["settings"]["experimental"] = true;
+	return result;
+}
+
 } // end anonymous namespace
 
 BOOST_AUTO_TEST_SUITE(StandardCompiler)
@@ -1925,97 +1932,97 @@ BOOST_AUTO_TEST_CASE(ethdebug_debug_info_ethdebug)
 {
 	static std::vector<std::tuple<Json, std::optional<std::function<bool(Json)>>>> tests{
 		{
-			generateStandardJson(false, Json::array({"ethdebug"}), Json::array({"*"})),
+			generateExperimentalStandardJson(false, Json::array({"ethdebug"}), Json::array({"*"})),
 			std::nullopt,
 		},
 		{
-			generateStandardJson(true, Json::array({"ethdebug"}), Json::array({"*"})),
+			generateExperimentalStandardJson(true, Json::array({"ethdebug"}), Json::array({"*"})),
 			std::nullopt,
 		},
 		{
-			generateStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug"})),
+			generateExperimentalStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug"})),
 			std::nullopt,
 		},
 		{
-			generateStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.deployedBytecode.ethdebug"})),
 			std::nullopt,
 		},
 		{
-			generateStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
 			std::nullopt,
 		},
 		{
-			generateStandardJson(false, Json::array({"ethdebug"}), Json::array({"irOptimized"})),
+			generateExperimentalStandardJson(false, Json::array({"ethdebug"}), Json::array({"irOptimized"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(false, Json::array({"ethdebug"}), Json::array({"irOptimized"})),
+			generateExperimentalStandardJson(false, Json::array({"ethdebug"}), Json::array({"irOptimized"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"irOptimized", "evm.bytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"irOptimized", "evm.bytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"irOptimized", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"irOptimized", "evm.deployedBytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"irOptimized", "evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"irOptimized", "evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"irOptimized", "evm.bytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"irOptimized", "evm.bytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"irOptimized", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"irOptimized", "evm.deployedBytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"irOptimized", "evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"irOptimized", "evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(true, Json::array({"ethdebug"}), Json::array({"irOptimized"}), YulCode()),
+			generateExperimentalStandardJson(true, Json::array({"ethdebug"}), Json::array({"irOptimized"}), YulCode()),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(true, Json::array({"ethdebug"}), Json::array({"irOptimized"}), YulCode()),
+			generateExperimentalStandardJson(true, Json::array({"ethdebug"}), Json::array({"irOptimized"}), YulCode()),
 			{}
 		},
 		{
-			generateStandardJson(true, Json::array({"ethdebugs"}), Json::array({"irOptimized"}), YulCode()), {}
+			generateExperimentalStandardJson(true, Json::array({"ethdebugs"}), Json::array({"irOptimized"}), YulCode()), {}
 		},
 		{
-			generateStandardJson(
+			generateExperimentalStandardJson(
 				true, Json::array({"ethdebug"}), {
 					{"fileA", {{"contractA", Json::array({"evm.deployedBytecode.bin"})}}},
 					{"fileB", {{"contractB", Json::array({"evm.bytecode.bin"})}}}
@@ -2028,11 +2035,11 @@ BOOST_AUTO_TEST_CASE(ethdebug_debug_info_ethdebug)
 			std::nullopt,
 		},
 		{
-			generateStandardJson(true, Json::array({"ethdebug"}), Json::array({"*"}), EvmAssemblyCode()),
+			generateExperimentalStandardJson(true, Json::array({"ethdebug"}), Json::array({"*"}), EvmAssemblyCode()),
 			std::nullopt,
 		},
 		{
-			generateStandardJson(true, Json::array({"ethdebug"}), Json::array({"*"}), SolidityAstCode()),
+			generateExperimentalStandardJson(true, Json::array({"ethdebug"}), Json::array({"*"}), SolidityAstCode()),
 			std::nullopt,
 		},
 	};
@@ -2049,57 +2056,57 @@ BOOST_AUTO_TEST_CASE(ethdebug_ethdebug_output)
 {
 	static std::vector<std::tuple<Json, std::optional<std::function<bool(Json)>>>> tests{
 		{
-			generateStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug"})),
+			generateExperimentalStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(false, {}, Json::array({"evm.bytecode.ethdebug"})),
+			generateExperimentalStandardJson(false, {}, Json::array({"evm.bytecode.ethdebug"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.deployedBytecode.ethdebug"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(false, {}, Json::array({"evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(false, {}, Json::array({"evm.deployedBytecode.ethdebug"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(false, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(false, {}, Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(false, {}, Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(true, Json::array({"location"}), Json::array({"evm.bytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, Json::array({"location"}), Json::array({"evm.bytecode.ethdebug"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(true, Json::array({"location"}), Json::array({"evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, Json::array({"location"}), Json::array({"evm.deployedBytecode.ethdebug"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(true, Json::array({"location"}), Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, Json::array({"location"}), Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(true, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.contains("ethdebug") && result["contracts"]["fileA"]["C"]["evm"]["bytecode"].contains("ethdebug");
 			}
 		},
 		{
-			generateStandardJson(true, Json::array({"ethdebug"}), Json::array({"evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, Json::array({"ethdebug"}), Json::array({"evm.deployedBytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.contains("ethdebug") && result["contracts"]["fileA"]["C"]["evm"]["deployedBytecode"].contains("ethdebug");
 			}
 		},
 		{
-			generateStandardJson(true, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, Json::array({"ethdebug"}), Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.contains("ethdebug") && result["contracts"]["fileA"]["C"]["evm"]["deployedBytecode"].contains("ethdebug") &&
@@ -2107,21 +2114,21 @@ BOOST_AUTO_TEST_CASE(ethdebug_ethdebug_output)
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.contains("ethdebug") && result["contracts"]["fileA"]["C"]["evm"]["bytecode"].contains("ethdebug");
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.deployedBytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.contains("ethdebug") && result["contracts"]["fileA"]["C"]["evm"]["deployedBytecode"].contains("ethdebug");
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"})),
 			[](const Json& result)
 			{
 				return result.contains("ethdebug") && result["contracts"]["fileA"]["C"]["evm"]["deployedBytecode"].contains("ethdebug") &&
@@ -2129,29 +2136,29 @@ BOOST_AUTO_TEST_CASE(ethdebug_ethdebug_output)
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "ir"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "ir"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos && result.contains("ethdebug") && result["contracts"]["fileA"]["C"]["evm"]["bytecode"].contains("ethdebug");
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.deployedBytecode.ethdebug", "ir"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.deployedBytecode.ethdebug", "ir"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos && result.contains("ethdebug") && result["contracts"]["fileA"]["C"]["evm"]["deployedBytecode"].contains("ethdebug");
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.bytecode.ethdebugs"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.bytecode.ethdebugs"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.deployedBytecode.ethdebugs"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.deployedBytecode.ethdebugs"})),
 			std::nullopt
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug", "ir"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug", "ir"})),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos && result.contains("ethdebug") && result["contracts"]["fileA"]["C"]["evm"]["deployedBytecode"].contains("ethdebug") &&
@@ -2159,36 +2166,36 @@ BOOST_AUTO_TEST_CASE(ethdebug_ethdebug_output)
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "ir"}), YulCode()),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "ir"}), YulCode()),
 			[](const Json& result)
 			{
 				return result.dump().find("/// ethdebug: enabled") != std::string::npos && result["contracts"]["fileA"]["object"]["evm"]["bytecode"].contains("ethdebug");
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.deployedBytecode.ethdebug", "ir"}), YulCode()),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.deployedBytecode.ethdebug", "ir"}), YulCode()),
 			std::nullopt
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug", "ir"}), YulCode()),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug", "ir"}), YulCode()),
 			std::nullopt
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.bytecode"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.bytecode"})),
 			[](const Json& result)
 			{
 				return result.dump().find("ethdebug") == std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(true, {}, Json::array({"evm.deployedBytecode"})),
+			generateExperimentalStandardJson(true, {}, Json::array({"evm.deployedBytecode"})),
 			[](const Json& result)
 			{
 				return result.dump().find("ethdebug") == std::string::npos;
 			}
 		},
 		{
-			generateStandardJson(
+			generateExperimentalStandardJson(
 				true, {}, {
 					{"fileA", {{"contractA", Json::array({"evm.deployedBytecode.ethdebug"})}}},
 					{"fileB", {{"contractB", Json::array({"evm.bytecode.ethdebug"})}}}
@@ -2218,7 +2225,7 @@ BOOST_AUTO_TEST_CASE(ethdebug_ethdebug_output)
 BOOST_DATA_TEST_CASE(ethdebug_output_instructions_smoketest, boost::unit_test::data::make({"deployedBytecode", "bytecode"}), bytecodeType)
 {
 	frontend::StandardCompiler compiler;
-	Json result = compiler.compile(generateStandardJson(true, {}, Json::array({std::string("evm.") + bytecodeType + ".ethdebug"})));
+	Json result = compiler.compile(generateExperimentalStandardJson(true, {}, Json::array({std::string("evm.") + bytecodeType + ".ethdebug"})));
 	BOOST_REQUIRE(result["contracts"]["fileA"]["C"]["evm"][bytecodeType].contains("ethdebug"));
 	bool creation = std::string(bytecodeType) == "bytecode";
 	Json ethdebugInstructionsToCheck = result["contracts"]["fileA"]["C"]["evm"][bytecodeType]["ethdebug"];
@@ -2256,6 +2263,204 @@ BOOST_DATA_TEST_CASE(ethdebug_output_instructions_smoketest, boost::unit_test::d
 		else
 			BOOST_REQUIRE(!instruction["operation"].contains("arguments"));
 	}
+}
+
+BOOST_AUTO_TEST_CASE(no_experimental_import_ast_solidity_evmasm)
+{
+	frontend::StandardCompiler compiler;
+	{
+		char const* input = R"(
+		{
+			"language": "SolidityAST",
+			"sources": {
+				"A.sol": {
+					"content": "contract A { constructor() { uint x = 2; { uint y = 3; } } }"
+				}
+			}
+		}
+		)";
+
+		Json parsedInput;
+		BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
+		Json result = compiler.compile(parsedInput);
+		BOOST_CHECK(containsError(result, "FatalError", "'SolidityAST' and 'EVMAssembly' inputs are experimental, and can only be used by toggling the 'settings.experimental' option."));
+	}
+	{
+		char const* input = R"(
+		{
+			"language": "SolidityAST",
+			"sources": {
+				"A": {
+		            "assemblyJson": {
+		                ".code": [
+		                    { "name": "PUSH", "value": "0" }
+						]
+					}
+				}
+			}
+		}
+		)";
+
+		Json parsedInput;
+		BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
+		Json result = compiler.compile(parsedInput);
+		BOOST_CHECK(containsError(result, "FatalError", "'SolidityAST' and 'EVMAssembly' inputs are experimental, and can only be used by toggling the 'settings.experimental' option."));
+	}
+}
+
+BOOST_AUTO_TEST_CASE(no_experimental_invalid_output_selection)
+{
+	frontend::StandardCompiler compiler;
+	{
+		char const* input = R"(
+		{
+			"language": "Solidity",
+			"sources": {
+				"A.sol": {
+					"content": "contract A { constructor() { uint x = 2; { uint y = 3; } } }"
+				}
+			},
+			"settings": {
+				"outputSelection": {
+					"A.sol": {
+						"A": ["irAst"]
+					}
+				}
+			}
+		}
+		)";
+
+		Json parsedInput;
+		BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
+		Json result = compiler.compile(parsedInput);
+		BOOST_CHECK(containsError(result, "FatalError", "'irAst', 'irOptimizedAst' and 'yulCFGJson' outputs are experimental, and can only be used by toggling the 'settings.experimental' option."));
+	}
+	{
+		char const* input = R"(
+		{
+			"language": "Solidity",
+			"sources": {
+				"A.sol": {
+					"content": "contract A { constructor() { uint x = 2; { uint y = 3; } } }"
+				}
+			},
+			"settings": {
+				"outputSelection": {
+					"A.sol": {
+						"A": ["irOptimizedAst"]
+					}
+				}
+			}
+		}
+		)";
+
+		Json parsedInput;
+		BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
+		Json result = compiler.compile(parsedInput);
+		BOOST_CHECK(containsError(result, "FatalError", "'irAst', 'irOptimizedAst' and 'yulCFGJson' outputs are experimental, and can only be used by toggling the 'settings.experimental' option."));
+	}
+	{
+		char const* input = R"(
+		{
+			"language": "Solidity",
+			"sources": {
+				"A.sol": {
+					"content": "contract A { constructor() { uint x = 2; { uint y = 3; } } }"
+				}
+			},
+			"settings": {
+				"outputSelection": {
+					"A.sol": {
+						"A": ["yulCFGJson"]
+					}
+				}
+			}
+		}
+		)";
+
+		Json parsedInput;
+		BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
+		Json result = compiler.compile(parsedInput);
+		BOOST_CHECK(containsError(result, "FatalError", "'irAst', 'irOptimizedAst' and 'yulCFGJson' outputs are experimental, and can only be used by toggling the 'settings.experimental' option."));
+	}
+}
+
+BOOST_AUTO_TEST_CASE(no_experimental_ethdebug)
+{
+	frontend::StandardCompiler compiler;
+	char const* input = R"(
+	{
+		"language": "Solidity",
+		"sources": {
+			"A.sol": {
+				"content": "contract A { constructor() { uint x = 2; { uint y = 3; } } }"
+			}
+		},
+		"settings": {
+			"viaIR": true,
+			"debug": {
+				"debugInfo": ["ethdebug"]
+			},
+			"outputSelection": {
+				"A.sol": {
+					"A": ["evm.bytecode.ethdebug", "evm.deployedBytecode.ethdebug"]
+				}
+			}
+		}
+	}
+	)";
+
+	Json parsedInput;
+	BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
+	Json result = compiler.compile(parsedInput);
+	BOOST_CHECK(containsError(result, "FatalError", "'settings.debug.debugInfo.ethdebug' is experimental, and can only be used by toggling the 'settings.experimental' option."));
+}
+
+BOOST_AUTO_TEST_CASE(no_experimental_eof)
+{
+	frontend::StandardCompiler compiler;
+	char const* input = R"(
+	{
+		"language": "Solidity",
+		"sources": {
+			"A.sol": {
+				"content": "contract A { constructor() { uint x = 2; { uint y = 3; } } }"
+			}
+		},
+		"settings": {
+			"eofVersion": 1,
+			"evmVersion": "osaka"
+		}
+	}
+	)";
+
+	Json parsedInput;
+	BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
+	Json result = compiler.compile(parsedInput);
+	BOOST_CHECK(containsError(result, "FatalError", "'eofVersion' is experimental, and can only be used by toggling the 'settings.experimental' option."));
+}
+
+BOOST_AUTO_TEST_CASE(experimental_non_boolean)
+{
+	frontend::StandardCompiler compiler;
+	char const* input = R"(
+	{
+		"language": "Solidity",
+		"sources": {
+			"A.sol": {
+				"content": "contract A { constructor() { uint x = 2; { uint y = 3; } } }"
+			}
+		},
+		"settings": {
+			"experimental": 1
+		}
+	}
+	)";
+
+	Json parsedInput;
+	BOOST_REQUIRE(util::jsonParseStrict(input, parsedInput));
+	Json result = compiler.compile(parsedInput);
+	BOOST_CHECK(containsError(result, "JSONError", "\"settings.experimental\" must be a Boolean."));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
