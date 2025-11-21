@@ -1178,7 +1178,7 @@ BOOST_AUTO_TEST_CASE(evm_version)
 	}
 	// test default
 	result = compile(inputForVersion(""));
-	BOOST_CHECK(result["contracts"]["fileA"]["A"]["metadata"].get<std::string>().find("\"evmVersion\":\"prague\"") != std::string::npos);
+	BOOST_CHECK(result["contracts"]["fileA"]["A"]["metadata"].get<std::string>().find("\"evmVersion\":\"osaka\"") != std::string::npos);
 	// test invalid
 	result = compile(inputForVersion("\"evmVersion\": \"invalid\","));
 	BOOST_CHECK(result["errors"][0]["message"].get<std::string>() == "Invalid EVM version requested.");
